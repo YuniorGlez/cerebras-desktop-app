@@ -2,6 +2,9 @@ const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
+// Determine if running in development
+const isDev = process.env.NODE_ENV !== 'production';
+
 // Create ~/Library/Logs/Cerebras Desktop if it does not exist
 app.setAppLogsPath();
 const logFile = path.join(app.getPath('logs'), 'main.log');
@@ -85,6 +88,18 @@ app.whenReady().then(async () => {
     const currentSettings = loadSettings();
     const { discoveredTools } = mcpManager.getMcpState(); // Use module object
     chatHandler.handleChatStream(event, messages, model, currentSettings, modelContextSizes, discoveredTools);
+  });
+
+  // Multidialog query handler
+  ipcMain.on('multidialog-query', async (event, userPrompt) => {
+    const currentSettings = loadSettings();
+    chatHandler.handleMultidialogQuery(event, userPrompt, currentSettings);
+  });
+
+  // Multidialog synthesis handler (using handle for async return)
+  ipcMain.handle('multidialog-synthesize', async (event, originalUserQuery, synthesisInstructions, responses) => {
+    const currentSettings = loadSettings();
+    return chatHandler.handleMultidialogSynthesize(event, originalUserQuery, synthesisInstructions, responses, currentSettings);
   });
 
   // Tool execution (use module object)

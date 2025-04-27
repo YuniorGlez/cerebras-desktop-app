@@ -1,6 +1,7 @@
 // TODO: Migrar a cerebras-sdk cuando esté disponible
 const Cerebras = require('@cerebras/cerebras_cloud_sdk');
 const { pruneMessageHistory } = require('./messageUtils'); // Import pruning logic
+const { MODEL_CONTEXT_SIZES } = require('../shared/models'); // Corrected path
 
 /**
  * Handles the 'chat-stream' IPC event for streaming chat completions.
@@ -264,6 +265,139 @@ async function handleChatStream(event, messages, model, settings, modelContextSi
     }
 }
 
+/**
+ * Handles the 'multidialog-query' IPC event for sending a prompt to multiple models.
+ *
+ * @param {Electron.IpcMainEvent} event - The IPC event object.
+ * @param {string} userPrompt - The user's prompt.
+ * @param {object} settings - The current application settings.
+ */
+async function handleMultidialogQuery(event, userPrompt, settings) {
+    console.log(`Handling multidialog-query. Prompt: ${userPrompt.substring(0, 50)}...`);
+
+    if (!settings.CEREBRAS_API_KEY || settings.CEREBRAS_API_KEY === "<replace me>") {
+        event.sender.send('multidialog-response', {
+            model: 'Error',
+            error: "API key not configured. Please add your CEREBRAS API key in settings.",
+        });
+        return;
+    }
+
+    const client = new Cerebras({ apiKey: settings.CEREBRAS_API_KEY });
+
+    // Filter to include only Cerebras models (excluding the synthesis model for now)
+    const targetModels = Object.keys(MODEL_CONTEXT_SIZES).filter(
+        model => model !== 'default' && model !== 'deepseek-r1-distill-llama-70b'
+        // Add more specific filtering if needed, e.g., !model.includes('deepseek')
+    );
+
+    console.log(`Querying models: ${targetModels.join(', ')}`);
+
+    const promises = targetModels.map(async (modelName) => {
+        try {
+            console.log(`Querying ${modelName}...`);
+            const completion = await client.chat.completions.create({
+                messages: [
+                    { role: "system", content: "You are a helpful assistant." },
+                    { role: "user", content: userPrompt },
+                ],
+                model: modelName,
+                temperature: settings.temperature ?? 0.7,
+                top_p: settings.top_p ?? 0.95,
+                stream: false, // We want the full response for each model here
+            });
+
+            const responseContent = completion.choices?.[0]?.message?.content;
+            console.log(`Response from ${modelName} received.`);
+            event.sender.send('multidialog-response', {
+                model: modelName,
+                response: responseContent || "No content received",
+                error: null,
+            });
+        } catch (error) {
+            console.error(`Error querying model ${modelName}:`, error);
+            event.sender.send('multidialog-response', {
+                model: modelName,
+                response: null,
+                error: `Failed to get response: ${error.message}`,
+            });
+        }
+    });
+
+    // Wait for all individual model queries to start sending responses
+    // The actual waiting happens on the frontend as responses arrive
+    Promise.allSettled(promises).then(() => {
+        console.log("All multidialog queries initiated.");
+        // Optionally send a final event when all attempts are done, though individual responses handle this
+        // event.sender.send('multidialog-all-attempts-complete');
+    });
+}
+
+/**
+ * Handles the 'multidialog-synthesize' IPC event for synthesizing responses.
+ *
+ * @param {Electron.IpcMainEvent} event - The IPC event object.
+ * @param {string} originalUserQuery - The original user query.
+ * @param {string} synthesisInstructions - The prompt/instructions for the synthesis model.
+ * @param {Array<object>} responses - Array of responses from individual models [{ model, response, error }].
+ * @param {object} settings - The current application settings.
+ */
+async function handleMultidialogSynthesize(event, originalUserQuery, synthesisInstructions, responses, settings) {
+    console.log(`Handling multidialog-synthesize for query: ${originalUserQuery.substring(0, 50)}...`);
+    const SYNTHESIS_MODEL = 'deepseek-r1-distill-llama-70b';
+
+    if (!settings.CEREBRAS_API_KEY || settings.CEREBRAS_API_KEY === "<replace me>") {
+        return { error: "API key not configured." };
+    }
+
+    const client = new Cerebras({ apiKey: settings.CEREBRAS_API_KEY });
+
+    // Filter out errored responses
+    const successfulResponses = responses.filter(r => r.response && !r.error);
+    if (successfulResponses.length === 0) {
+        return { error: "No successful individual responses to synthesize." };
+    }
+
+    // Format the successful responses into a string block
+    let modelResponsesBlock = "";
+    successfulResponses.forEach((res) => {
+        modelResponsesBlock += `--- Response from ${res.model} ---\n${res.response}\n\n`;
+    });
+    modelResponsesBlock = modelResponsesBlock.trim(); // Remove trailing newline
+
+    // Replace placeholders in the synthesis instructions template
+    let finalSynthesisPrompt = synthesisInstructions
+        .replace('{USER_QUERY}', originalUserQuery)
+        .replace('{MODEL_RESPONSES}', modelResponsesBlock);
+
+    try {
+        console.log(`Synthesizing with ${SYNTHESIS_MODEL} using instructions...`);
+        // console.log("Final Synthesis Prompt:", finalSynthesisPrompt); // Optional: Log the final prompt for debugging
+
+        const completion = await client.chat.completions.create({
+            messages: [
+                // The system prompt might be implicitly handled by the detailed instructions
+                // If needed, add a generic system role: { role: "system", content: "You are an AI synthesizer." },
+                { role: "user", content: finalSynthesisPrompt }, // Use the instructions template as the user prompt
+            ],
+            model: SYNTHESIS_MODEL,
+            temperature: settings.temperature ?? 0.5, // Maybe slightly lower temp for synthesis
+            top_p: settings.top_p ?? 0.95,
+            stream: false,
+        });
+
+        const synthesizedResponse = completion.choices?.[0]?.message?.content;
+        console.log("Synthesis complete.");
+        return { response: synthesizedResponse || "Synthesis model returned no content.", error: null };
+
+    } catch (error) {
+        console.error('Error during synthesis:', error);
+        return { response: null, error: `Synthesis failed: ${error.message}` };
+    }
+}
+
 module.exports = {
-    handleChatStream
+    handleChatStream,
+    handleMultidialogQuery,
+    handleMultidialogSynthesize // Export the new handler
 }; 

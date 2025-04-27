@@ -11,6 +11,7 @@ import AppShell from './components/AppShell';
 import Home from './pages/Home';
 import Profile from './pages/Profile';
 import ManagementPage from './pages/ManagementPage';
+import MultidialogPage from './pages/MultidialogPage';
 
 const router = createHashRouter([
   {
@@ -22,6 +23,7 @@ const router = createHashRouter([
       { path: '/settings', element: <Settings /> },
       { path: '/profile', element: <Profile /> },
       { path: '/management', element: <ManagementPage /> },
+      { path: '/multidialog', element: <MultidialogPage /> },
     ],
   },
 ]);

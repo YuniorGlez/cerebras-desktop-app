@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, MessageCircle, Menu, Trash2, BookOpen } from 'lucide-react';
+import { Home, MessageCircle, Menu, Trash2, BookOpen, BrainCircuit } from 'lucide-react';
 import { useChat } from '../context/ChatContext';
 
 const navItems = [
     { to: '/', label: 'Home', icon: <Home size={20} /> },
     { to: '/chat', label: 'Chat', icon: <MessageCircle size={20} /> },
+    { to: '/multidialog', label: 'Multidialog', icon: <BrainCircuit size={20} /> },
     { to: '/management', label: 'Management', icon: <BookOpen size={20} /> }
 ];
 

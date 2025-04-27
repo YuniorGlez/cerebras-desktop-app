@@ -7,12 +7,12 @@ contextBridge.exposeInMainWorld('electron', {
   reloadSettings: () => ipcRenderer.invoke('reload-settings'),
   // Chat API - streaming only
   executeToolCall: (toolCall) => ipcRenderer.invoke('execute-tool-call', toolCall),
-  
+
   // Streaming API events
   startChatStream: (messages, model) => {
     // Start a new chat stream
     ipcRenderer.send('chat-stream', messages, model);
-    
+
     // Setup event listeners for streaming responses
     return {
       onStart: (callback) => {
@@ -44,14 +44,32 @@ contextBridge.exposeInMainWorld('electron', {
       }
     };
   },
-  
+
+  // Multidialog API
+  startMultidialogQuery: (userPrompt) => {
+    ipcRenderer.send('multidialog-query', userPrompt);
+    return {
+      onResponse: (callback) => {
+        // This listener will be called multiple times, once for each model response
+        const listener = (_, data) => callback(data); // data: { model, response, error }
+        ipcRenderer.on('multidialog-response', listener);
+        return () => ipcRenderer.removeListener('multidialog-response', listener);
+      },
+      // Optional: Add an onError listener if needed for overall query failure?
+      // Optional: Add an onComplete listener?
+      cleanup: () => {
+        ipcRenderer.removeAllListeners('multidialog-response');
+      }
+    };
+  },
+
   // MCP related functions
   connectMcpServer: (serverConfig) => ipcRenderer.invoke('connect-mcp-server', serverConfig),
   disconnectMcpServer: (serverId) => ipcRenderer.invoke('disconnect-mcp-server', serverId),
   getMcpTools: () => ipcRenderer.invoke('get-mcp-tools'),
   // Function to get model configurations
   getModelConfigs: () => ipcRenderer.invoke('get-model-configs'),
-  
+
   // Add event listener for MCP server status changes
   onMcpServerStatusChanged: (callback) => {
     const listener = (event, status) => callback(status);
@@ -59,7 +77,7 @@ contextBridge.exposeInMainWorld('electron', {
     // Return a function to remove the listener
     return () => ipcRenderer.removeListener('mcp-server-status-changed', listener);
   },
-  
+
   // MCP Log Handling
   getMcpServerLogs: (serverId) => ipcRenderer.invoke('get-mcp-server-logs', serverId),
   onMcpLogUpdate: (callback) => {
@@ -75,6 +93,11 @@ contextBridge.exposeInMainWorld('electron', {
     const listener = (event, data) => callback(data);
     ipcRenderer.on('mcp-auth-reconnect-complete', listener);
     return () => ipcRenderer.removeListener('mcp-auth-reconnect-complete', listener);
+  },
+
+  synthesizeMultidialogResponses: (originalUserQuery, synthesisInstructions, responses) => {
+    // Pass all arguments to the main process handler
+    return ipcRenderer.invoke('multidialog-synthesize', originalUserQuery, synthesisInstructions, responses);
   },
 
   // Other?
