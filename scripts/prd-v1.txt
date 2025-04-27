@@ -1,0 +1,48 @@
+# Cerebras Desktop App v1 – Product Requirements Document (PRD)
+
+## Overview
+Cerebras Desktop App v1 is a next-generation AI chat and productivity desktop application, designed to deliver a beautiful, modern, and highly interactive user experience. The goal is to move beyond a simple chat interface, providing users with advanced features such as chat history, voice dictation, powerful search, customizable contexts, and seamless integration of MCP tools. The app targets developers, power users, and AI enthusiasts who demand both aesthetics and productivity from their tools.
+
+***Current Phase:*** The application has completed its foundational UI/UX overhaul and core chat functionalities. Development is now focused on implementing advanced features like MCP tool management, voice dictation, custom contexts, and accessibility enhancements.
+
+## Core Features (Current Focus)
+- **Custom Contexts**: Let users create, save, and manage personalized chat contexts for reuse in conversations. (Task ID: 10)
+- **Voice Dictation**: Enable users to dictate messages by voice, with real-time transcription to text (similar to ChatGPT). Support for multiple languages and accessibility. (Task ID: 11)
+- **MCP Tool Integration (npx-style)**: Allow users to add and manage MCP tools via npx-like commands, not just via SSE servers. Provide a UI for discovering, installing, and running MCP tools. (Task IDs: 12, 13)
+- **Accessibility Improvements**: Enhance accessibility with keyboard navigation, screen reader support, and voice control integration. (Task ID: 14)
+
+## User Experience
+- **Personas**: Developers and technical users seeking advanced AI chat and automation. Power users who value customization, speed, and productivity. Users with accessibility needs (voice, keyboard navigation).
+- **Key User Flows**: Launch app → Home screen → Start new chat or resume previous chat. Use Cmd+K to search chats, commands, or features. Dictate a message by voice and see it transcribed. Add a new MCP tool via command and use it in chat. Customize profile and save preferred chat contexts.
+- **UI/UX Considerations**: Consistent, modern design language (shadcn/ui, Magic UI). Responsive layouts for different screen sizes. Smooth transitions and feedback for actions. Accessibility: keyboard shortcuts, screen reader support, voice input.
+
+## Technical Architecture
+- **Frontend**: React (functional components, hooks). shadcn/ui and Magic UI for component library. State management via React Context and local storage for chat history. Integration with Electron for desktop features.
+- **Backend/Electron**: Electron main process for window management, file system access, and MCP tool orchestration. MCP tool management: support for npx-style tool installation and execution. Voice dictation: integration with browser or OS-level speech-to-text APIs.
+- **Data Models**: Chat session: { id, title, messages[], createdAt, updatedAt }. User profile: { name, avatar, contexts[] }. MCP tool: { id, name, installCommand, status }.
+- **APIs & Integrations**: Cerebras Cloud SDK for AI completions. MCP tool registry and execution. Speech-to-text API (browser or third-party).
+- **Infrastructure**: Local storage for chat history and settings. Optional cloud sync for future versions.
+
+## Development Roadmap (Current Focus)
+- Implement custom contexts management system.
+- Integrate voice dictation and real-time transcription.
+- Develop the MCP tool management system (npx-style installation/execution).
+- Create the UI for MCP tool discovery and management.
+- Perform accessibility audit and implement improvements.
+
+## Logical Dependency Chain (Current Tasks)
+1.  **MCP Tool Management System (Task 12)**: Core logic for npx-style tools.
+2.  **MCP Tool Discovery UI (Task 13)**: Depends on Task 12.
+3.  **Voice Dictation Integration (Task 11)**: Core voice input functionality.
+4.  **Accessibility Improvements (Task 14)**: Depends on Task 11 (for voice control).
+5.  **Custom Contexts Management (Task 10)**: Independent pending task.
+
+## Risks and Mitigations
+- **UI Complexity:** Risk of overcomplicating the interface. Mitigation: Start with MVP, validate with users, iterate.
+- **Voice Dictation Accuracy:** Speech-to-text may be unreliable. Mitigation: Use proven APIs, allow manual correction.
+- **MCP Tool Security:** Running npx-style commands can be risky. Mitigation: Sandbox execution, require user confirmation.
+- **Data Persistence:** Risk of data loss with local storage. Mitigation: Plan for future cloud sync, regular backups.
+
+## Appendix
+- Research: ChatGPT, v0.dev, Cursor, shadcn/ui, Magic UI, modern desktop app patterns.
+- Technical specs: See component library docs, Cerebras Cloud SDK docs, Electron docs. 

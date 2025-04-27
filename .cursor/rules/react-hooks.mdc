@@ -1,0 +1,99 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Custom React Hooks Usage
+
+This rule defines best practices for creating and using custom React Hooks in the Cerebras Desktop App, particularly after refactoring efforts that involved extracting business logic from components.
+
+## When to Create Custom Hooks
+
+*   **Reusable Stateful Logic:** When logic involving React state (`useState`, `useReducer`) and effects (`useEffect`) is used in multiple components.
+*   **Complex Component Logic:** To simplify components by extracting related state management, side effects, and event handlers into a dedicated hook.
+*   **Encapsulating External Interactions:** To manage interactions with browser APIs, `localStorage`, Electron IPC, or external services (like MCP servers or the Cerebras SDK via context/handlers).
+*   **Improving Testability:** Hooks allow isolating business logic for easier unit testing.
+
+## Standard Pattern
+
+1.  **Naming Convention:** Use the `use` prefix (e.g., `useChatState`, `useToolApproval`). Name the hook based on the logic it encapsulates.
+2.  **File Location:** Place custom hooks in the `src/renderer/hooks/` directory.
+3.  **Return Value:** Hooks should typically return an object or an array containing the state values and functions needed by the component. Prefer returning an object for better readability when multiple values are returned.
+4.  **Dependencies:** Clearly define dependencies for `useEffect`, `useCallback`, and `useMemo` within the hook to prevent stale closures and unnecessary re-renders.
+5.  **Parameterization:** Design hooks to be configurable via parameters if the logic needs to adapt to different component needs.
+6.  **Documentation:** Use JSDoc comments to explain the hook's purpose, parameters, and return values.
+
+## Examples
+
+*   **`useSettings` ([src/renderer/hooks/useSettings.js](mdc:src/renderer/hooks/useSettings.js)):** Likely encapsulates loading settings from `SettingsContext`, handling updates, potentially debouncing saves.
+*   **`useMcpServerForm` ([src/renderer/hooks/useMcpServerForm.js](mdc:src/renderer/hooks/useMcpServerForm.js)):** Manages the state and validation logic specific to the MCP server configuration form within the Settings page.
+*   **`useChatOrchestration` (Conceptual - logic extracted from App.jsx):** Would manage the flow of sending user messages, handling streaming responses, processing tool calls, and updating chat state via `ChatContext`.
+*   **`useToolApproval` (Conceptual - logic extracted from App.jsx):** Would handle checking `localStorage` for tool approval status, displaying the approval modal, and saving user preferences.
+
+```javascript
+// Example: Simplified useToolApproval structure
+import { useState, useCallback } from 'react';
+
+const APPROVAL_PREFIX = 'tool-approval-';
+const GLOBAL_YOLO = 'tool-approval-global';
+
+export function useToolApproval() {
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [pendingToolCall, setPendingToolCall] = useState(null);
+
+  const checkApproval = useCallback((toolName) => {
+    const globalPref = localStorage.getItem(GLOBAL_YOLO);
+    if (globalPref === 'yolo') {
+      return true; // Skip prompt
+    }
+    const toolPref = localStorage.getItem(`${APPROVAL_PREFIX}${toolName}`);
+    return toolPref === 'always'; // Skip prompt only if 'always'
+  }, []);
+
+  const requestApproval = useCallback((toolCall) => {
+    if (checkApproval(toolCall.name)) {
+      // Execute immediately (or return true indication)
+      console.log(`Tool ${toolCall.name} approved via stored preference.`);
+      return true;
+    } else {
+      // Need to prompt
+      setPendingToolCall(toolCall);
+      setShowApprovalModal(true);
+      return false;
+    }
+  }, [checkApproval]);
+
+  const handleApprovalDecision = useCallback((decision, toolName, remember) => {
+    setShowApprovalModal(false);
+    setPendingToolCall(null);
+
+    if (remember) {
+       if (decision === 'always') {
+         localStorage.setItem(`${APPROVAL_PREFIX}${toolName}`, 'always');
+       } else if (decision === 'yolo') {
+         localStorage.setItem(GLOBAL_YOLO, 'yolo');
+       }
+    }
+    // Return the decision (true if approved this time)
+    return decision === 'always' || decision === 'yolo' || decision === 'approve-once';
+  }, []);
+
+
+  return {
+    requestApproval, // Function to initiate check/prompt
+    showApprovalModal, // State to control modal visibility
+    pendingToolCall, // Tool call data needing approval
+    handleApprovalDecision, // Function to call from modal
+  };
+}
+```
+
+## Best Practices
+
+*   **Single Responsibility:** Hooks should focus on a specific piece of logic. Avoid creating monolithic hooks that do too much.
+*   **Follow Rules of Hooks:** Only call hooks at the top level of functional components or other custom hooks. Don't call hooks inside loops, conditions, or nested functions.
+*   **Dependency Management:** Be rigorous with dependency arrays in `useEffect`, `useCallback`, `useMemo`. Use ESLint plugins (`eslint-plugin-react-hooks`) to help enforce this.
+*   **Testing:** Write unit tests for custom hooks using tools like React Testing Library (`renderHook`).
+
+---
+*Leverage custom hooks to create cleaner, more reusable, and testable component logic.*

@@ -1,0 +1,42 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# React Context API Usage
+
+This rule defines the standard pattern for using the React Context API for global state management in the Cerebras Desktop App.
+
+## When to Use Context
+
+*   Use Context for global state that needs to be accessed by multiple components at different nesting levels, without excessive prop drilling.
+*   Examples: Chat state (`ChatContext`), Theme state (`ThemeProvider`).
+*   For state local to a single component or a small subtree, prefer `useState` or `useReducer`.
+
+## Standard Pattern
+
+Follow this structure when creating a new context:
+
+1.  **Create Context:** Define the context object.
+2.  **Create Provider Component:**
+    *   Manage the context's state (using `useState`, `useReducer`, etc.).
+    *   Define functions to update the state.
+    *   Wrap children with the `Context.Provider` and pass the state and update functions in the `value` prop.
+3.  **Create Consumer Hook:**
+    *   Create a custom hook (e.g., `useMyContext`) that uses `useContext`.
+    *   Include an error check to ensure the hook is used within the corresponding Provider.
+
+## Example: `ChatContext`
+
+See [src/renderer/context/ChatContext.jsx](mdc:src/renderer/context/ChatContext.jsx) for a complete implementation example.
+
+## Best Practices
+
+*   **Keep Context Focused:** Each context should manage a specific domain of state (e.g., chat, theme, user session, settings). See `ChatContext` and `SettingsContext` for examples.
+*   **Memoize Value Prop:** For contexts with complex values or frequent updates, consider memoizing the `value` prop using `useMemo` to prevent unnecessary re-renders of consumer components.
+*   **Provider Placement:** Place the Provider component high enough in the component tree so that all potential consumers are descendants.
+*   **Custom Hook:** Always provide a custom hook for consuming the context to encapsulate the `useContext` call and the undefined check.
+*   **Readability:** Use clear names for the context, provider, and hook.
+
+---
+*Use this pattern consistently when implementing global state management with the Context API.*

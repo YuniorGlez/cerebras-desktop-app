@@ -1,0 +1,94 @@
+{
+  "name": "cerebras-desktop-app",
+  "version": "1.0.0",
+  "description": "A simple Electron app with Cerebras API integration",
+  "main": "electron/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "concurrently \"pnpm dev:vite\" \"pnpm dev:electron\"",
+    "dev:vite": "vite",
+    "dev:electron": "cross-env NODE_ENV=development electron .",
+    "build": "vite build",
+    "build:electron": "electron-builder",
+    "dist": "pnpm build && pnpm build:electron"
+  },
+  "keywords": [
+    "electron",
+    "cerebras",
+    "desktop",
+    "chat"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@cerebras/cerebras_cloud_sdk": "latest",
+    "@modelcontextprotocol/sdk": "^1.7.0",
+    "@radix-ui/react-slot": "^1.2.0",
+    "@radix-ui/react-tooltip": "^1.2.4",
+    "ansi-to-html": "^0.7.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "electron-json-storage": "^4.6.0",
+    "lucide-react": "^0.503.0",
+    "node-fetch": "^2.6.6",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "7.3.0",
+    "react-syntax-highlighter": "^15.6.1",
+    "remark-gfm": "^4.0.1",
+    "tailwind-merge": "^3.2.0",
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.10",
+    "@babel/eslint-parser": "^7.27.0",
+    "@babel/preset-react": "^7.26.3",
+    "@eslint/js": "^9.25.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.16",
+    "concurrently": "9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^27.3.11",
+    "electron-builder": "^24.13.3",
+    "electron-is-dev": "^3.0.1",
+    "eslint": "^9.25.1",
+    "eslint-plugin-react": "^7.37.5",
+    "globals": "^16.0.0",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.3.3",
+    "vite": "^6.2.6",
+    "wait-on": "8.0.3"
+  },
+  "build": {
+    "appId": "com.cerebras.desktop",
+    "productName": "Cerebras Desktop",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "shared/**/*",
+      "node_modules/**/*"
+    ],
+    "asarUnpack": [
+      "electron/scripts/*.sh"
+    ],
+    "directories": {
+      "buildResources": "public",
+      "output": "release"
+    },
+    "mac": {
+      "category": "public.app-category.productivity"
+    }
+  },
+  "packageManager": "pnpm@10.9.0+sha512.0486e394640d3c1fb3c9d43d49cf92879ff74f8516959c235308f5a8f62e2e19528a65cdc2a3058f587cde71eba3d5b56327c8c33a97e4c4051ca48a10ca2d5f",
+  "pnpm": {
+    "ignoredBuiltDependencies": [
+      "electron",
+      "esbuild"
+    ],
+    "onlyBuiltDependencies": [
+      "electron"
+    ]
+  }
+}

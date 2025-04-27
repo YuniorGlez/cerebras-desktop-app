@@ -1,0 +1,68 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Local Storage Usage
+
+This rule outlines the standard practices for using `localStorage` within the Cerebras Desktop App.
+
+## Primary Use Cases
+
+*   **Chat History:**
+    *   Persisted under the key `cerebras-chats`.
+    *   Stores a JSON string array of chat session objects.
+    *   Managed via `ChatProvider` ([src/renderer/context/ChatContext.jsx](mdc:src/renderer/context/ChatContext.jsx)).
+*   **Application Settings:**
+    *   Persisted under the key `cerebras-settings`.
+    *   Stores a JSON string object of user settings (API keys, model params, etc.).
+    *   Managed via `SettingsProvider` ([src/renderer/context/SettingsContext.jsx](mdc:src/renderer/context/SettingsContext.jsx)).
+*   **Tool Approvals:**
+    *   Persisted under keys like `tool-approval-<tool_name>` or `tool-approval-global`.
+    *   Stores user preferences (`always`, `yolo`) for tool execution prompts.
+    *   Managed directly where tool approval is checked (e.g., within relevant hooks or components like the previous `App.jsx`, now likely in hooks like `useToolApproval`).
+
+## Key Functions (Example from `ChatContext.jsx`)
+
+```javascript
+const LOCAL_STORAGE_KEY = 'cerebras-chats';
+
+// Load chats on initialization
+function loadChats() {
+  try {
+    const data = localStorage.getItem(LOCAL_STORAGE_KEY);
+    // Return parsed data or an empty array if null/error
+    return data ? JSON.parse(data) : [];
+  } catch (error) {
+    console.error("Failed to load chats from localStorage:", error);
+    return []; // Return empty array on error
+  }
+}
+
+// Save chats whenever the state changes
+function saveChats(chats) {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(chats));
+  } catch (error) {
+     console.error("Failed to save chats to localStorage:", error);
+     // Consider notifying the user if saving fails repeatedly
+  }
+}
+
+// In ChatProvider component:
+useEffect(() => {
+  saveChats(chats);
+}, [chats]); // Save whenever chats state updates
+```
+
+## Best Practices
+
+*   **Centralize Access:** Avoid accessing `localStorage` directly from multiple components. Use a centralized service or context (like `ChatContext`, `SettingsContext`) to manage reads/writes for major data structures. For simple flags like tool approvals, direct access might be acceptable if encapsulated within a specific hook or function.
+*   **Use Constants for Keys:** Define storage keys as constants (e.g., `LOCAL_STORAGE_KEY_CHATS`, `LOCAL_STORAGE_KEY_SETTINGS`) to prevent typos.
+*   **Error Handling:** Always wrap `localStorage.getItem` and `localStorage.setItem` calls within `try...catch` blocks to handle potential errors (e.g., storage full, parsing errors, security restrictions).
+*   **JSON Serialization:** Store complex objects as JSON strings using `JSON.stringify()` and parse them with `JSON.parse()`.
+*   **Consider Limits:** Be mindful of `localStorage` size limits (typically 5-10MB). For larger data needs, consider alternatives like IndexedDB or storing data via the Electron Main process.
+*   **Data Structure:** Clearly define the structure of the data being stored. See [chat-data-management.md](mdc:docs/chat-data-management.md) for chat history and inspect `SettingsContext` for settings structure.
+
+---
+*Follow these guidelines when interacting with `localStorage` to ensure consistency and robustness.*

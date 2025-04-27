@@ -1,0 +1,58 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# React Component Structure
+
+This rule provides guidelines for structuring React components in the Cerebras Desktop App, promoting maintainability, readability, and separation of concerns.
+
+## Core Principles
+
+*   **Functional Components:** Primarily use functional components with hooks.
+*   **Single Responsibility:** Each component should ideally have one primary responsibility (rendering a piece of UI, managing a specific interaction).
+*   **Composition:** Build complex UIs by composing smaller, reusable components.
+*   **Separation of Concerns:** Separate UI rendering (JSX) from business logic (hooks) and state management (local state, context, hooks).
+
+## Component Organization
+
+*   **File Location:** Place components in `src/renderer/components/`. Organize into subdirectories based on feature (e.g., `chat/`, `settings/`) or type (e.g., `layout/`, `ui/`).
+*   **Naming:** Use `PascalCase` for component file names and component functions (e.g., `ChatInput.jsx`, `function ChatInput()`).
+*   **Colocation:** Consider colocating closely related private sub-components within the same file if they are not intended for reuse elsewhere.
+
+## State Management within Components
+
+*   **Local State:** Use `useState` for simple state directly related to the component's rendering or UI behavior (e.g., toggle states, input values).
+*   **Complex Local State:** Use `useReducer` for more complex state logic within a component or when the next state depends on the previous one.
+*   **Shared State:** Lift state up to the nearest common ancestor or use React Context (`useContext`) for state shared across multiple, potentially distant components. See [context-api.mdc](mdc:.cursor/rules/context-api.mdc).
+*   **Business Logic State:** Encapsulate complex state management logic tied to business rules or external interactions within custom hooks. See [react-hooks.mdc](mdc:.cursor/rules/react-hooks.mdc).
+
+## Props vs. Context
+
+*   **Props:** Use props for passing data and callbacks down the component tree, especially for direct parent-child relationships. Clearly define prop types (using PropTypes or TypeScript).
+*   **Context:** Use context to avoid prop drilling for deeply nested components that need access to global or shared state (e.g., theme, user session, chat state).
+
+## Example: Refactored Settings Component
+
+Consider the refactoring of `Settings.jsx` ([src/renderer/pages/Settings.jsx](mdc:src/renderer/pages/Settings.jsx)).
+
+*   **Page Component (`Settings.jsx`):** Acts as a container, fetches necessary data using `useSettings` hook (which uses `SettingsContext`), and orchestrates the rendering of smaller, focused sub-components.
+*   **Sub-Components (in `src/renderer/components/settings/`):**
+    *   `ApiKeySettings.jsx`: Manages UI and state specifically for API key inputs.
+    *   `ModelParameters.jsx`: Handles UI for model parameter adjustments.
+    *   `McpServerList.jsx`: Displays the list of configured MCP servers.
+    *   `McpServerForm.jsx`: Contains the form logic for adding/editing MCP servers, potentially using the `useMcpServerForm` hook for its internal state and validation.
+*   **Hooks:**
+    *   `useSettings`: Manages loading/saving settings via context.
+    *   `useMcpServerForm`: Manages form state, validation, parsing JSON/form modes.
+
+## Best Practices
+
+*   **Keep Components Small:** Aim for smaller, focused components.
+*   **Minimize State:** Components should manage minimal state. Prefer deriving state or using context/hooks for complex scenarios.
+*   **Readability:** Structure JSX logically. Use clear prop names.
+*   **Memoization:** Use `React.memo` for components that receive complex props or render frequently, but only when performance profiling indicates a benefit.
+*   **Accessibility:** Include necessary ARIA attributes and ensure keyboard navigability.
+
+---
+*Follow these guidelines to build a well-structured and maintainable React component architecture.*

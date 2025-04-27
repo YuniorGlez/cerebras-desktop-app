@@ -1,0 +1,101 @@
+---
+description: Guidelines for creating and maintaining Cursor rules to ensure consistency and effectiveness.
+globs: .cursor/rules/*.mdc
+alwaysApply: true
+---
+# Cerebras Desktop App – Cursor Rules
+
+These rules are the canonical source for code style, structure, and best practices in the Cerebras Desktop App. Follow them for all coding, documentation, and rule-writing tasks. Reference actual files and code whenever possible.
+
+## Project Structure Overview
+- Main React entry/router setup: [src/renderer/main.jsx](mdc:src/renderer/main.jsx)
+- Main application layout/composition: [src/renderer/components/layout/AppLayout.jsx](mdc:src/renderer/components/layout/AppLayout.jsx)
+- Electron main process: [electron/main.js](mdc:electron/main.js)
+- Shared logic: [shared/]
+- React components: [src/renderer/components/]
+- Context providers: [src/renderer/context/]
+- Pages: [src/renderer/pages/]
+- Utilities: [src/renderer/utils/]
+- MCP integration: [electron/mcpManager.js](mdc:electron/mcpManager.js)
+- Chat/SDK integration: [electron/chatHandler.js](mdc:electron/chatHandler.js)
+- Documentation: [README.md](mdc:README.md), [docs/](mdc:docs)
+- Rules: [.cursor/rules/](mdc:.cursor/rules)
+
+## Naming Conventions & Code Style
+- Use `camelCase` for variables and functions, `PascalCase` for React components/classes.
+- File names: use `PascalCase.jsx` for components, `camelCase.js` for utilities.
+- Prefer named exports over default unless a file exports a single main entity.
+- Use clear, descriptive names for all functions, variables, and components.
+- Keep code DRY: extract repeated logic into shared utilities ([src/renderer/utils/](mdc:src/renderer/utils)).
+- Use Prettier and ESLint for formatting and linting. See [eslint.config.js](mdc:eslint.config.js).
+
+## Cerebras Cloud SDK Usage
+- All AI completions and chat logic must use the Cerebras Cloud SDK ([electron/chatHandler.js](mdc:electron/chatHandler.js)).
+- API keys are managed via settings context/state ([src/renderer/context/SettingsContext.jsx](mdc:src/renderer/context/SettingsContext.jsx)).
+- Never hardcode secrets or API keys in code or documentation.
+- Reference the official SDK documentation in [docs/cerebras-cloud-sdk-node-streaming.md](mdc:docs/cerebras-cloud-sdk-node-streaming.md) for advanced usage.
+
+## MCP Tools – Adding & Maintaining
+- Tool discovery and connection management for *server-based* tools: [electron/mcpManager.js](mdc:electron/mcpManager.js).
+- *Npx-style* tool management is planned (Task 12/13).
+- To add a new *server-based* tool:
+  1. Ensure it's registered/exposed by a configured MCP server.
+  2. Ensure its schema and description are clear and actionable.
+  3. Test tool discovery and execution from the UI ([src/renderer/App.jsx](mdc:src/renderer/App.jsx)).
+- Document new tools in [docs/mcp-integration.md](mdc:docs/mcp-integration.md).
+- Keep tool schemas and descriptions up to date.
+
+## Documentation & Rule Updates
+- All documentation must be in English and reference only Cerebras and the current stack.
+- Update [README.md](mdc:README.md) and [docs/](mdc:docs) for any new features or changes.
+- When adding new code patterns, update or create rules in [.cursor/rules/](mdc:.cursor/rules).
+- Cross-reference related rules and documentation for maintainability.
+- Refer to [chat-data-management.md](mdc:docs/chat-data-management.md) for details on chat persistence.
+- Follow patterns in [localstorage.mdc](mdc:.cursor/rules/localstorage.mdc) and [context-api.mdc](mdc:.cursor/rules/context-api.mdc) for state and storage.
+
+## Testing & Verification
+- All new features must include tests or manual verification steps.
+- Use `pnpm build` and `pnpm dev` to verify builds and runtime.
+- For MCP tools, test both tool discovery and execution.
+- Document test strategies in the relevant task or PR.
+
+## React & Electron Best Practices
+- Use functional components and React hooks ([src/renderer/components/](mdc:src/renderer/components)). See [react-hooks.mdc](mdc:.cursor/rules/react-hooks.mdc) and [component-structure.mdc](mdc:.cursor/rules/component-structure.mdc).
+- Keep component state minimal; use context for shared state ([src/renderer/context/ChatContext.jsx](mdc:src/renderer/context/ChatContext.jsx), [src/renderer/context/SettingsContext.jsx](mdc:src/renderer/context/SettingsContext.jsx)). See [context-api.mdc](mdc:.cursor/rules/context-api.mdc).
+- Separate UI (components), logic (hooks), and data fetching/management (context/hooks).
+- For Electron, keep main process logic in [electron/main.js](mdc:electron/main.js) and renderer logic in [src/renderer/](mdc:src/renderer).
+- Use IPC securely via preload scripts for communication between renderer and main process.
+
+## Example: Adding a New MCP Server Tool
+```js
+// In MCP server config:
+{
+  "name": "myCustomTool",
+  "description": "Performs a custom action.",
+  "input_schema": { "type": "object", "properties": { ... } }
+}
+```
+- Register the tool, restart the MCP server, and verify it appears in the UI.
+- Add usage documentation in [docs/mcp-integration.md](mdc:docs/mcp-integration.md).
+
+## Example: Using the Cerebras Cloud SDK
+See [electron/chatHandler.js](mdc:electron/chatHandler.js):
+```js
+const Cerebras = require('@cerebras/cerebras_cloud_sdk');
+const client = new Cerebras({ apiKey: settings.CEREBRAS_API_KEY });
+// ...
+```
+
+## Keeping Rules DRY & Cross-Referenced
+- Reference other rules using `[rule-name.mdc](mdc:.cursor/rules/rule-name.mdc)`.
+- Reference relevant documentation using `[doc-name.md](mdc:docs/doc-name.md)`.
+- Avoid duplicating content; link to canonical sources.
+- Update rules after major refactors or new patterns.
+
+## Continuous Improvement
+- Monitor code reviews and update rules for new best practices.
+- Add real code examples from the codebase.
+- Remove outdated or unused rules regularly.
+
+---
+*These rules are the single source of truth for AI coding and documentation in Cerebras Desktop App. Always keep them up to date and actionable.* 
