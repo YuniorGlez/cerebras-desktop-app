@@ -38,6 +38,9 @@ importers:
       node-fetch:
         specifier: ^2.6.6
         version: 2.7.0
+      prop-types:
+        specifier: ^15.8.1
+        version: 15.8.1
       react:
         specifier: 19.0.0
         version: 19.0.0
