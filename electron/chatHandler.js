@@ -270,27 +270,30 @@ async function handleChatStream(event, messages, model, settings, modelContextSi
  *
  * @param {Electron.IpcMainEvent} event - The IPC event object.
  * @param {string} userPrompt - The user's prompt.
+ * @param {string[]} targetModels - Array of model names to query.
  * @param {object} settings - The current application settings.
  */
-async function handleMultidialogQuery(event, userPrompt, settings) {
-    console.log(`Handling multidialog-query. Prompt: ${userPrompt.substring(0, 50)}...`);
+async function handleMultidialogQuery(event, userPrompt, targetModels, settings) {
+    console.log(`Handling multidialog-query for ${targetModels.length} models. Prompt: ${userPrompt.substring(0, 50)}...`);
 
     if (!settings.CEREBRAS_API_KEY || settings.CEREBRAS_API_KEY === "<replace me>") {
-        event.sender.send('multidialog-response', {
-            model: 'Error',
-            error: "API key not configured. Please add your CEREBRAS API key in settings.",
+        // Send error for each target model so frontend knows to expect N responses
+        targetModels.forEach(modelName => {
+            event.sender.send('multidialog-response', {
+                model: modelName,
+                error: "API key not configured. Please add your CEREBRAS API key in settings.",
+            });
         });
         return;
+    }
+    if (!targetModels || targetModels.length === 0) {
+        console.warn("Multidialog query called with no target models.");
+        return; // Or send an appropriate error/empty response?
     }
 
     const client = new Cerebras({ apiKey: settings.CEREBRAS_API_KEY });
 
-    // Filter to include only Cerebras models (excluding the synthesis model for now)
-    const targetModels = Object.keys(MODEL_CONTEXT_SIZES).filter(
-        model => model !== 'default' && model !== 'deepseek-r1-distill-llama-70b'
-        // Add more specific filtering if needed, e.g., !model.includes('deepseek')
-    );
-
+    // Use the provided targetModels array directly
     console.log(`Querying models: ${targetModels.join(', ')}`);
 
     const promises = targetModels.map(async (modelName) => {
@@ -340,12 +343,16 @@ async function handleMultidialogQuery(event, userPrompt, settings) {
  * @param {string} originalUserQuery - The original user query.
  * @param {string} synthesisInstructions - The prompt/instructions for the synthesis model.
  * @param {Array<object>} responses - Array of responses from individual models [{ model, response, error }].
+ * @param {string} synthesisModelName - The name of the model to use for synthesis.
  * @param {object} settings - The current application settings.
  */
-async function handleMultidialogSynthesize(event, originalUserQuery, synthesisInstructions, responses, settings) {
-    console.log(`Handling multidialog-synthesize for query: ${originalUserQuery.substring(0, 50)}...`);
-    const SYNTHESIS_MODEL = 'deepseek-r1-distill-llama-70b';
+async function handleMultidialogSynthesize(event, originalUserQuery, synthesisInstructions, responses, synthesisModelName, settings) {
+    console.log(`Handling multidialog-synthesize with model ${synthesisModelName} for query: ${originalUserQuery.substring(0, 50)}...`);
+    // const SYNTHESIS_MODEL = 'deepseek-r1-distill-llama-70b'; // No longer hardcoded
 
+    if (!synthesisModelName) {
+        return { error: "Synthesis model name not provided." };
+    }
     if (!settings.CEREBRAS_API_KEY || settings.CEREBRAS_API_KEY === "<replace me>") {
         return { error: "API key not configured." };
     }
@@ -371,7 +378,7 @@ async function handleMultidialogSynthesize(event, originalUserQuery, synthesisIn
         .replace('{MODEL_RESPONSES}', modelResponsesBlock);
 
     try {
-        console.log(`Synthesizing with ${SYNTHESIS_MODEL} using instructions...`);
+        console.log(`Synthesizing with ${synthesisModelName} using instructions...`);
         // console.log("Final Synthesis Prompt:", finalSynthesisPrompt); // Optional: Log the final prompt for debugging
 
         const completion = await client.chat.completions.create({
@@ -380,8 +387,8 @@ async function handleMultidialogSynthesize(event, originalUserQuery, synthesisIn
                 // If needed, add a generic system role: { role: "system", content: "You are an AI synthesizer." },
                 { role: "user", content: finalSynthesisPrompt }, // Use the instructions template as the user prompt
             ],
-            model: SYNTHESIS_MODEL,
-            temperature: settings.temperature ?? 0.5, // Maybe slightly lower temp for synthesis
+            model: synthesisModelName, // Use the selected model name
+            temperature: settings.temperature ?? 0.5,
             top_p: settings.top_p ?? 0.95,
             stream: false,
         });
@@ -391,7 +398,7 @@ async function handleMultidialogSynthesize(event, originalUserQuery, synthesisIn
         return { response: synthesizedResponse || "Synthesis model returned no content.", error: null };
 
     } catch (error) {
-        console.error('Error during synthesis:', error);
+        console.error(`Error during synthesis with ${synthesisModelName}:`, error);
         return { response: null, error: `Synthesis failed: ${error.message}` };
     }
 }

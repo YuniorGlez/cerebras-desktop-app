@@ -91,15 +91,15 @@ app.whenReady().then(async () => {
   });
 
   // Multidialog query handler
-  ipcMain.on('multidialog-query', async (event, userPrompt) => {
+  ipcMain.on('multidialog-query', async (event, userPrompt, targetModels) => {
     const currentSettings = loadSettings();
-    chatHandler.handleMultidialogQuery(event, userPrompt, currentSettings);
+    chatHandler.handleMultidialogQuery(event, userPrompt, targetModels, currentSettings);
   });
 
   // Multidialog synthesis handler (using handle for async return)
-  ipcMain.handle('multidialog-synthesize', async (event, originalUserQuery, synthesisInstructions, responses) => {
+  ipcMain.handle('multidialog-synthesize', async (event, originalUserQuery, synthesisInstructions, responses, synthesisModel) => {
     const currentSettings = loadSettings();
-    return chatHandler.handleMultidialogSynthesize(event, originalUserQuery, synthesisInstructions, responses, currentSettings);
+    return chatHandler.handleMultidialogSynthesize(event, originalUserQuery, synthesisInstructions, responses, synthesisModel, currentSettings);
   });
 
   // Tool execution (use module object)

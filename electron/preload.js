@@ -46,8 +46,8 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   // Multidialog API
-  startMultidialogQuery: (userPrompt) => {
-    ipcRenderer.send('multidialog-query', userPrompt);
+  startMultidialogQuery: (userPrompt, targetModels) => {
+    ipcRenderer.send('multidialog-query', userPrompt, targetModels);
     return {
       onResponse: (callback) => {
         // This listener will be called multiple times, once for each model response
@@ -95,9 +95,9 @@ contextBridge.exposeInMainWorld('electron', {
     return () => ipcRenderer.removeListener('mcp-auth-reconnect-complete', listener);
   },
 
-  synthesizeMultidialogResponses: (originalUserQuery, synthesisInstructions, responses) => {
-    // Pass all arguments to the main process handler
-    return ipcRenderer.invoke('multidialog-synthesize', originalUserQuery, synthesisInstructions, responses);
+  synthesizeMultidialogResponses: (originalUserQuery, synthesisInstructions, responses, synthesisModel) => {
+    // Pass all arguments to the main process handler, including synthesisModel
+    return ipcRenderer.invoke('multidialog-synthesize', originalUserQuery, synthesisInstructions, responses, synthesisModel);
   },
 
   // Other?
