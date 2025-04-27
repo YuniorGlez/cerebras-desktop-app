@@ -49,6 +49,13 @@ Welcome to the official launch of Cerebras Desktop v1.0.0, your fast, fluid, and
 - Global search across all chats
 
 
+### 4. Context & Prompt Management
+
+![Management Page Placeholder](/docs/images/management-page.png)
+
+- Manage your custom contexts and AI prompt templates from a dedicated settings page.
+
+
 ---
 
 ## 📦 Getting Started
@@ -75,6 +82,7 @@ For a deep dive, explore our docs folder:
 - **Tech Stack**: [technology-stack.md](technology-stack.md)
 - **SDK Streaming**: [cerebras-cloud-sdk-node-streaming.md](cerebras-cloud-sdk-node-streaming.md)
 - **Developer Setup**: [setup-development.md](setup-development.md)
+- **Context & Prompt Management**: [ManagementPage.jsx](src/renderer/pages/ManagementPage.jsx)
 
 ---
 
