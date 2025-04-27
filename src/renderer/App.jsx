@@ -3,15 +3,14 @@ import ToolsPanel from './components/ToolsPanel';
 import ToolApprovalModal from './components/ToolApprovalModal';
 import { useChat } from './context/ChatContext';
 import { estimateTokenCount } from './utils/tokenUtils';
-import { useTheme } from "./components/theme/ThemeProvider";
 import { useToolApproval } from './hooks/useToolApproval';
 import { useMcpManagement } from './hooks/useMcpManagement';
 import { useModelManagement } from './hooks/useModelManagement';
+import { useContextManager } from './context/ContextManagerContext';
 
 // Import Layout Components
 import TopBar from './components/layout/TopBar';
 import ChatArea from './components/layout/ChatArea';
-import InputArea from './components/layout/InputArea';
 
 function App() {
 	// --- Hooks Initialization ---
@@ -25,8 +24,6 @@ function App() {
 		renameChat,
 	} = useChat();
 
-	// Theme hook might be needed for main div class later?
-	const { theme } = useTheme();
 
 	const {
 		mcpTools,
@@ -46,6 +43,14 @@ function App() {
 
 	const [loading, setLoading] = useState(false);
 	const messagesEndRef = useRef(null);
+
+	// Added state for context selection
+	const [selectedContextId, setSelectedContextId] = useState('none');
+	const { listContexts, getContext, prompts, listPrompts, getPrompt, isLoaded: isContextManagerLoaded } = useContextManager();
+
+	// Added state for prompt selection and input control
+	const [selectedPromptId, setSelectedPromptId] = useState('none');
+	const [chatInputValue, setChatInputValue] = useState('');
 
 	// --- Tool Approval Hook Dependencies (Need to define functions before passing) ---
 	// Define processToolCalls placeholder first, it will be reassigned by the hook
@@ -144,8 +149,10 @@ function App() {
 	// --- Tool Approval Hook Setup ---
 	const handleChatFlowComplete = useCallback(({ currentMessages, assistantMessage, toolResponseMessages, lastSentAt }) => {
 		console.log("Chat flow completed, preparing next turn.");
+		// Prepare API messages including the potential system context message (if applicable)
+		// Note: executeChatTurn will need access to selectedContextId or the context itself
 		const nextApiMessages = [
-			...currentMessages,
+			...currentMessages, // This should already contain the system context message if used
 			{ role: assistantMessage.role, content: assistantMessage.content, tool_calls: assistantMessage.tool_calls },
 			...toolResponseMessages.map(msg => ({ role: 'tool', content: msg.content, tool_call_id: msg.tool_call_id }))
 		];
@@ -155,10 +162,9 @@ function App() {
 			console.error("Error continuing chat flow:", err);
 			setLoading(false);
 		});
-	}, [executeChatTurn, setLoading]);
+	}, [executeChatTurn, setLoading]); // Added executeChatTurn, setLoading
 
 	const toolApprovalHookResult = useToolApproval(setLoading, handleChatFlowComplete);
-	// Reassign processToolCalls from the hook's return value
 	processToolCalls = toolApprovalHookResult.processToolCalls;
 	const { pendingApprovalCall, handleToolApproval, isPaused } = toolApprovalHookResult;
 
@@ -176,19 +182,47 @@ function App() {
 		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 	}, [activeChat?.messages]);
 
-	const handleSendMessage = useCallback(async (content) => {
-		if (!activeChatId || isPaused) return;
+	const handleSendMessage = useCallback(async () => {
+		if (!activeChatId || isPaused || !isContextManagerLoaded) return;
 
-		const isStructuredContent = Array.isArray(content);
-		const hasContent = isStructuredContent ? content.some(part => (part.type === 'text' && part.text.trim()) || part.type === 'image_url') : content.trim();
-		if (!hasContent) return;
+		const currentInput = chatInputValue.trim();
+		if (!currentInput) return;
+
+		const isStructuredContent = false;
+		const messageContent = currentInput;
 
 		const sentAt = Date.now();
-		const userMessage = { role: 'user', content: content, sentAt };
+		const userMessage = { role: 'user', content: messageContent, sentAt };
 		addMessageToChat(activeChatId, userMessage);
 		setLoading(true);
+		setChatInputValue('');
+		setSelectedPromptId('none');
 
-		const initialApiMessages = [...(activeChat?.messages || []), userMessage];
+		let initialApiMessages = [...(activeChat?.messages || []), userMessage];
+
+		if (selectedContextId && selectedContextId !== 'none') {
+			const context = getContext(selectedContextId);
+			if (context) {
+				console.log(`Using context: ${context.name}`);
+				const contextSystemMessage = {
+					role: 'system',
+					content: `The following context should be used to inform your response:\n\n---\nCONTEXT START\nNAME: ${context.name}${context.description ? `\nDESCRIPTION: ${context.description}` : ''}\nCONTENT:\n${context.content}\nCONTEXT END\n---\
+\nRemember to strictly adhere to this context.`
+				};
+				let insertIndex = 0;
+				for (let i = initialApiMessages.length - 2; i >= 0; i--) {
+					if (initialApiMessages[i].role === 'system') {
+						insertIndex = i + 1;
+						break;
+					}
+				}
+				initialApiMessages.splice(insertIndex, 0, contextSystemMessage);
+			} else {
+				console.warn(`Selected context ID ${selectedContextId} not found.`);
+				setSelectedContextId('none');
+			}
+		}
+
 		let currentApiMessages = initialApiMessages;
 		let continueLoop = true;
 
@@ -226,14 +260,30 @@ function App() {
 		} else {
 			setLoading(false);
 		}
-	}, [activeChatId, addMessageToChat, activeChat?.messages, setLoading, executeChatTurn, isPaused, updateLastMessageInChat]);
+	}, [activeChatId, addMessageToChat, activeChat?.messages, setLoading, executeChatTurn, isPaused, updateLastMessageInChat, selectedContextId, getContext, isContextManagerLoaded, chatInputValue, setChatInputValue, setSelectedPromptId, setSelectedContextId]);
 
 	// --- Render ---
-	// Get messages AFTER hooks are initialized
 	const messages = activeChat?.messages || [];
-	// Determine if the chat is empty (or only has system messages)
 	const userOrAssistantMessages = messages?.filter(m => m.role === 'user' || m.role === 'assistant') || [];
 	const isEmptyChat = userOrAssistantMessages.length === 0;
+
+	const availableContexts = isContextManagerLoaded ? listContexts({ isTemplate: false }) : [];
+	const availablePrompts = isContextManagerLoaded ? listPrompts() : [];
+
+	const handlePromptSelect = (promptId) => {
+		setSelectedPromptId(promptId);
+		if (promptId && promptId !== 'none') {
+			const prompt = getPrompt(promptId);
+			if (prompt) {
+				setChatInputValue(prompt.content);
+			} else {
+				setChatInputValue('');
+			}
+		} else {
+			// Optionally clear input when "None" is selected, or keep existing value
+			// setChatInputValue('');
+		}
+	};
 
 	return (
 		<div className="flex flex-col h-full w-full">
@@ -255,18 +305,16 @@ function App() {
 					loading={loading}
 					isPaused={isPaused}
 					visionSupported={visionSupported}
+					selectedContextId={selectedContextId}
+					setSelectedContextId={setSelectedContextId}
+					availableContexts={availableContexts}
+					selectedPromptId={selectedPromptId}
+					handlePromptSelect={handlePromptSelect}
+					availablePrompts={availablePrompts}
+					inputValue={chatInputValue}
+					setInputValue={setChatInputValue}
+					isEmptyChat={isEmptyChat}
 				/>
-				{!isEmptyChat && (
-					<InputArea
-						mcpServersStatus={mcpServersStatus}
-						toggleToolsPanel={toggleToolsPanel}
-						refreshMcpTools={refreshMcpTools}
-						handleSendMessage={handleSendMessage}
-						loading={loading}
-						isPaused={isPaused}
-						visionSupported={visionSupported}
-					/>
-				)}
 			</div>
 
 			{isToolsPanelOpen && (

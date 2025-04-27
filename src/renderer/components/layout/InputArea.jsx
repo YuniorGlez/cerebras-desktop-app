@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import ChatInput from '../ChatInput';
 
 // Simple component to display status indicator
 const StatusIndicator = ({ loading, message, onRefresh }) => {
@@ -30,22 +29,20 @@ const InputArea = ({
     handleSendMessage,
     loading,
     isPaused,
-    visionSupported,
     hideMcpStatusBar,
     inputValue,
     setInputValue
 }) => {
-    // If controlled, use props; else, manage local state
+    // Removed local state management if controlled
+    const isControlled = typeof inputValue === 'string' && typeof setInputValue === 'function';
     const [localValue, setLocalValue] = useState("");
-    const value = typeof inputValue === 'string' ? inputValue : localValue;
-    const onChange = setInputValue ? (e) => setInputValue(e.target.value) : (e) => setLocalValue(e.target.value);
+    const value = isControlled ? inputValue : localValue;
+    const onChange = isControlled ? (e) => setInputValue(e.target.value) : (e) => setLocalValue(e.target.value);
 
     const onSubmit = (e) => {
         e.preventDefault();
         if (!value.trim() || loading || isPaused) return;
         handleSendMessage(value);
-        if (setInputValue) setInputValue("");
-        else setLocalValue("");
     };
 
     return (

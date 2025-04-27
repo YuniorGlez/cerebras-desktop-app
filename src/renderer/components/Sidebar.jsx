@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, MessageCircle, Settings as SettingsIcon, Menu, Trash2 } from 'lucide-react';
+import { Home, MessageCircle, Menu, Trash2, BookOpen } from 'lucide-react';
 import { useChat } from '../context/ChatContext';
 
 const navItems = [
     { to: '/', label: 'Home', icon: <Home size={20} /> },
     { to: '/chat', label: 'Chat', icon: <MessageCircle size={20} /> },
-    // Settings se moverá a la navbar
+    { to: '/management', label: 'Management', icon: <BookOpen size={20} /> }
 ];
 
 const Sidebar = ({ collapsed, onToggle }) => {
@@ -15,7 +15,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
     const [showAll, setShowAll] = useState(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState(null);
     const chatsToShow = showAll ? recentChats : recentChats.slice(0, 5);
-    // Persistir estado de colapso
+
     useEffect(() => {
         localStorage.setItem('sidebar-collapsed', collapsed ? 'true' : 'false');
     }, [collapsed]);

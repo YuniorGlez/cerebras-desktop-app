@@ -12,11 +12,18 @@ const ChatArea = ({
     refreshMcpTools,
     loading,
     isPaused,
-    visionSupported
+    visionSupported,
+    selectedContextId,
+    setSelectedContextId,
+    availableContexts,
+    selectedPromptId,
+    handlePromptSelect,
+    availablePrompts,
+    inputValue,
+    setInputValue,
+    isEmptyChat
 }) => {
     const { activeChatId, addMessageToChat } = useChat();
-
-    const userOrAssistantMessages = messages?.filter(m => m.role === 'user' || m.role === 'assistant') || [];
 
     const handleRemoveLastMessage = useCallback(() => {
         const currentMessages = messages || [];
@@ -25,8 +32,6 @@ const ChatArea = ({
         // Pass null for message to indicate replacement
         addMessageToChat(activeChatId, null, newMsgs);
     }, [activeChatId, messages, addMessageToChat]);
-
-    const isEmptyChat = userOrAssistantMessages.length === 0;
 
     return (
         <div className="flex-1 overflow-y-auto p-2 bg-background flex flex-col">
@@ -39,6 +44,14 @@ const ChatArea = ({
                     loading={loading}
                     isPaused={isPaused}
                     visionSupported={visionSupported}
+                    selectedContextId={selectedContextId}
+                    setSelectedContextId={setSelectedContextId}
+                    availableContexts={availableContexts}
+                    selectedPromptId={selectedPromptId}
+                    handlePromptSelect={handlePromptSelect}
+                    availablePrompts={availablePrompts}
+                    inputValue={inputValue}
+                    setInputValue={setInputValue}
                 />
             ) : (
                 <>
