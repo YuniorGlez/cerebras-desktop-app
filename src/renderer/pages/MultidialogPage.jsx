@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Copy, Info, FolderSearch, FileText, Bot, CheckSquare, Square } from 'lucide-react';
+import { Copy, Info, FolderSearch, FileText, Bot, CheckSquare, Square, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -64,6 +64,10 @@ Your unique response without mentioning the others responses:
 const DEFAULT_CALLS_PER_MINUTE = 60; // Default rate limit (essentially unlimited)
 const MAX_CALLS_PER_MINUTE = 60;
 
+const DEFAULT_TEMPERATURE = 0.7;
+
+const LOCAL_STORAGE_KEY = 'multidialogConfig';
+
 function MultidialogPage() {
     const { contexts, prompts } = useContextManager();
     const [synthesisPrompt, setSynthesisPrompt] = useState(DEFAULT_SYNTHESIS_INSTRUCTIONS);
@@ -80,20 +84,18 @@ function MultidialogPage() {
     const [selectedSynthesisModel, setSelectedSynthesisModel] = useState(DEFAULT_SYNTHESIS_MODEL);
     const [callsPerMinuteLimit, setCallsPerMinuteLimit] = useState(DEFAULT_CALLS_PER_MINUTE); // New state for rate limit
 
-    // Per-model config: { [modelName]: { iterations, delaySec } }
+    // Per-model config: { [modelName]: { iterations, delaySec, temperature } }
     const [modelCallConfig, setModelCallConfig] = useState(() => Object.fromEntries(
-        AVAILABLE_MODELS.map(m => [m, { iterations: 1, delaySec: 0 }])
+        AVAILABLE_MODELS.map(m => [m, { iterations: 1, delaySec: 0, temperature: DEFAULT_TEMPERATURE }])
     ));
 
     // Update config when models are toggled
     useEffect(() => {
         setModelCallConfig(prev => {
             const updated = { ...prev };
-            // Ensure all selected models have config
             selectedTargetModels.forEach(m => {
-                if (!updated[m]) updated[m] = { iterations: 1, delaySec: 0 };
+                if (!updated[m]) updated[m] = { iterations: 1, delaySec: 0, temperature: DEFAULT_TEMPERATURE };
             });
-            // Remove config for unselected models
             Object.keys(updated).forEach(m => {
                 if (!selectedTargetModels.includes(m)) delete updated[m];
             });
@@ -102,13 +104,26 @@ function MultidialogPage() {
     }, [selectedTargetModels]);
 
     const handleModelConfigChange = (model, field, value) => {
+        let numValue = Number(value);
+        // Clamp temperature between 0.0 and 2.0
+        if (field === 'temperature') {
+            numValue = Math.max(0.0, Math.min(2.0, numValue));
+        } else {
+            numValue = Math.max(0, numValue);
+        }
+
         setModelCallConfig(prev => ({
             ...prev,
             [model]: {
                 ...prev[model],
-                [field]: Math.max(0, Number(value))
+                [field]: numValue
             }
         }));
+    };
+
+    const handleModelTempSliderChange = (model, value) => {
+        const tempValue = value[0]; // Slider returns array
+        handleModelConfigChange(model, 'temperature', tempValue);
     };
 
     // Calculate total expected time (max sum of all model delays)
@@ -308,6 +323,55 @@ function MultidialogPage() {
         return acc;
     }, {});
 
+    // Load config from localStorage on mount
+    useEffect(() => {
+        const savedConfigRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (savedConfigRaw) {
+            try {
+                const savedConfig = JSON.parse(savedConfigRaw);
+                if (savedConfig.selectedTargetModels) {
+                    setSelectedTargetModels(savedConfig.selectedTargetModels);
+                }
+                if (savedConfig.selectedSynthesisModel) {
+                    setSelectedSynthesisModel(savedConfig.selectedSynthesisModel);
+                }
+                if (savedConfig.modelCallConfig) {
+                    // Merge saved config with defaults to ensure all models have entries
+                    setModelCallConfig(prev => {
+                        const loadedConf = savedConfig.modelCallConfig;
+                        const mergedConf = { ...prev }; // Start with current state (which includes defaults)
+                        Object.keys(loadedConf).forEach(modelName => {
+                            if (mergedConf[modelName]) { // Only update if model still exists
+                                mergedConf[modelName] = { ...mergedConf[modelName], ...loadedConf[modelName] };
+                            }
+                        });
+                        return mergedConf;
+                    });
+                }
+                toast.info("Loaded saved Multidialog configuration.");
+            } catch (error) {
+                console.error("Failed to parse saved multidialog config:", error);
+                localStorage.removeItem(LOCAL_STORAGE_KEY); // Clear corrupted data
+                toast.error("Failed to load saved configuration.");
+            }
+        }
+    }, []); // Empty array ensures this runs only once on mount
+
+    const handleSaveConfig = () => {
+        try {
+            const configToSave = {
+                selectedTargetModels,
+                selectedSynthesisModel,
+                modelCallConfig,
+            };
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(configToSave));
+            toast.success("Multidialog configuration saved successfully!");
+        } catch (error) {
+            console.error("Failed to save multidialog config:", error);
+            toast.error("Failed to save configuration.");
+        }
+    };
+
     return (
         <TooltipProvider>
             <div className="grid grid-cols-2 gap-4 h-full overflow-hidden">
@@ -315,9 +379,22 @@ function MultidialogPage() {
                 {/* Left Column: Configuration */}
                 <ScrollArea className="h-full p-4 border-r">
                     <div className="space-y-4">
-                        <h1 className="text-2xl font-semibold">Multidialog Configuration</h1>
+                        <div className="flex justify-between items-center">
+                            <h1 className="text-2xl font-semibold">Multidialog Configuration</h1>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" onClick={handleSaveConfig}>
+                                        <Save className="h-5 w-5" />
+                                        <span className="sr-only">Save Configuration</span>
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Save current settings (models, iterations, delays, temperature) to local storage.</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </div>
                         <p className="text-muted-foreground">
-                            Configure target models, iterations, delays, and synthesis model.
+                            Configure target models, iterations, delays, temperature, and synthesis model.
                         </p>
 
                         {/* Model Selection Section */}
@@ -325,12 +402,22 @@ function MultidialogPage() {
                             {/* Target Model Selection */}
                             <div className="space-y-2">
                                 <Label className="font-medium">Target Models (for parallel query)</Label>
+                                <div className="grid grid-cols-[auto,1fr,60px,32px,60px,60px,100px,40px] items-center gap-2 text-xs text-muted-foreground px-2 pb-1 border-b">
+                                    <div></div>
+                                    <div>Model</div>
+                                    <div className="text-center">Iter</div>
+                                    <div></div>
+                                    <div className="text-center">Delay</div>
+                                    <div></div>
+                                    <div className="text-center">Temp</div>
+                                    <div></div>
+                                </div>
                                 <ScrollArea className="h-48 border rounded-md p-2">
                                     <div className="space-y-2">
                                         {AVAILABLE_MODELS.map(modelName => (
                                             <div
                                                 key={modelName}
-                                                className="grid grid-cols-[auto,1fr,60px,32px,60px,60px] items-center gap-2"
+                                                className="grid grid-cols-[auto,1fr,60px,32px,60px,60px,100px,40px] items-center gap-2"
                                             >
                                                 <Checkbox
                                                     id={`target-${modelName}`}
@@ -340,7 +427,8 @@ function MultidialogPage() {
                                                 />
                                                 <label
                                                     htmlFor={`target-${modelName}`}
-                                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 truncate pr-1"
+                                                    title={modelName}
                                                 >
                                                     {modelName}
                                                 </label>
@@ -351,7 +439,7 @@ function MultidialogPage() {
                                                             min={1}
                                                             value={modelCallConfig[modelName]?.iterations || 1}
                                                             onChange={e => handleModelConfigChange(modelName, 'iterations', e.target.value)}
-                                                            className="w-14 h-7 text-xs px-1"
+                                                            className="w-14 h-7 text-xs px-1 text-center"
                                                             disabled={isLoading || isSynthesizing}
                                                         />
                                                         <span className="text-xs">iter</span>
@@ -360,13 +448,25 @@ function MultidialogPage() {
                                                             min={0}
                                                             value={modelCallConfig[modelName]?.delaySec || 0}
                                                             onChange={e => handleModelConfigChange(modelName, 'delaySec', e.target.value)}
-                                                            className="w-14 h-7 text-xs px-1"
+                                                            className="w-14 h-7 text-xs px-1 text-center"
                                                             disabled={isLoading || isSynthesizing}
                                                         />
                                                         <span className="text-xs">sec delay</span>
+                                                        <Slider
+                                                            value={[modelCallConfig[modelName]?.temperature ?? DEFAULT_TEMPERATURE]}
+                                                            min={0}
+                                                            max={2}
+                                                            step={0.1}
+                                                            onValueChange={(val) => handleModelTempSliderChange(modelName, val)}
+                                                            className="w-full h-7 py-2.5"
+                                                            disabled={isLoading || isSynthesizing}
+                                                        />
+                                                        <span className="text-xs text-right tabular-nums">
+                                                            {(modelCallConfig[modelName]?.temperature ?? DEFAULT_TEMPERATURE).toFixed(1)}
+                                                        </span>
                                                     </>
                                                 ) : (
-                                                    <><div></div><div></div><div></div><div></div></>
+                                                    <><div></div><div></div><div></div><div></div><div></div><div></div></>
                                                 )}
                                             </div>
                                         ))}

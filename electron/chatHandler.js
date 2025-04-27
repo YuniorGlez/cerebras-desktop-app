@@ -303,9 +303,10 @@ async function handleMultidialogQuery(event, userPrompt, targetModels, modelCall
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
     const promises = targetModels.map(async (modelName) => {
-        const config = modelCallConfig[modelName] || { iterations: 1, delaySec: 0 };
-        const iterations = Math.max(1, config.iterations); // Ensure at least 1 iteration
+        const config = modelCallConfig[modelName] || { iterations: 1, delaySec: 0, temperature: settings.temperature ?? 0.7 }; // Include temperature from config or default
+        const iterations = Math.max(1, config.iterations);
         const delayMs = Math.max(0, config.delaySec * 1000);
+        const temperature = config.temperature; // Use configured temperature
 
         for (let i = 0; i < iterations; i++) {
             try {
@@ -313,15 +314,15 @@ async function handleMultidialogQuery(event, userPrompt, targetModels, modelCall
                     console.log(`Delaying ${delayMs}ms before iteration ${i + 1} for ${modelName}`);
                     await delay(delayMs);
                 }
-                console.log(`Querying ${modelName} (Iteration ${i + 1}/${iterations})...`);
+                console.log(`Querying ${modelName} (Iteration ${i + 1}/${iterations}, Temp: ${temperature})...`); // Log temp
                 const completion = await client.chat.completions.create({
                     messages: [
                         { role: "system", content: "You are a helpful assistant." },
-                        { role: "user", content: userPrompt }, // Maybe add iteration info? { role: "user", content: `${userPrompt}\n\n(Iteration ${i+1})` }
+                        { role: "user", content: userPrompt },
                     ],
                     model: modelName,
-                    temperature: settings.temperature ?? 0.7,
-                    top_p: settings.top_p ?? 0.95,
+                    temperature: temperature, // Use the model-specific temperature
+                    top_p: settings.top_p ?? 0.95, // Still use global top_p
                     stream: false,
                 });
 
