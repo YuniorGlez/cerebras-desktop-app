@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import ToolCall from './ToolCall';
 
-function Message({ message, children, onToolCallExecute, allMessages, isLastMessage, onRemoveMessage }) {
+function Message({ message, children, onToolCallExecute, allMessages }) {
   const { role, tool_calls, reasoning, isStreaming } = message;
   const [showReasoning, setShowReasoning] = useState(false);
   const [showTimePopup, setShowTimePopup] = useState(false);

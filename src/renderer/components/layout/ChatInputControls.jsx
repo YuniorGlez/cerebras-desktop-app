@@ -79,6 +79,7 @@ const ChatInputControls = ({
                 visionSupported={visionSupported}
                 inputValue={inputValue}
                 setInputValue={setInputValue}
+                hideMcpStatusBar={true}
             // Pass hideMcpStatusBar if needed, or manage within InputArea/ChatInputControls
             />
         </div>

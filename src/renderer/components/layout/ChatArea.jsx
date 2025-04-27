@@ -1,6 +1,7 @@
 import React, { useRef, useCallback } from 'react';
 import MessageList from '../MessageList';
 import InitialChatView from './InitialChatView';
+import ChatInputControls from './ChatInputControls';
 import { useChat } from '../../context/ChatContext';
 
 const ChatArea = ({
@@ -34,13 +35,39 @@ const ChatArea = ({
     }, [activeChatId, messages, addMessageToChat]);
 
     return (
-        <div className="flex-1 overflow-y-auto p-2 bg-background flex flex-col">
-            {isEmptyChat ? (
-                <InitialChatView
-                    handleSendMessage={handleSendMessage}
+        <div className="flex-1 flex flex-col bg-background">
+            <div className="flex-1 overflow-y-auto p-2">
+                {isEmptyChat ? (
+                    <InitialChatView
+                        handleSendMessage={handleSendMessage}
+                        mcpServersStatus={mcpServersStatus}
+                        toggleToolsPanel={toggleToolsPanel}
+                        refreshMcpTools={refreshMcpTools}
+                        loading={loading}
+                        isPaused={isPaused}
+                        visionSupported={visionSupported}
+                        selectedContextId={selectedContextId}
+                        setSelectedContextId={setSelectedContextId}
+                        availableContexts={availableContexts}
+                        selectedPromptId={selectedPromptId}
+                        handlePromptSelect={handlePromptSelect}
+                        availablePrompts={availablePrompts}
+                        inputValue={inputValue}
+                        setInputValue={setInputValue}
+                    />
+                ) : (
+                    <>
+                        <MessageList messages={messages} onRemoveLastMessage={handleRemoveLastMessage} />
+                        <div ref={messagesEndRef} />
+                    </>
+                )}
+            </div>
+            {!isEmptyChat && (
+                <ChatInputControls
                     mcpServersStatus={mcpServersStatus}
                     toggleToolsPanel={toggleToolsPanel}
                     refreshMcpTools={refreshMcpTools}
+                    handleSendMessage={handleSendMessage}
                     loading={loading}
                     isPaused={isPaused}
                     visionSupported={visionSupported}
@@ -53,11 +80,6 @@ const ChatArea = ({
                     inputValue={inputValue}
                     setInputValue={setInputValue}
                 />
-            ) : (
-                <>
-                    <MessageList messages={messages} onRemoveLastMessage={handleRemoveLastMessage} />
-                    <div ref={messagesEndRef} />
-                </>
             )}
         </div>
     );
