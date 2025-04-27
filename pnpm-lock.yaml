@@ -14,6 +14,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.7.0
         version: 1.10.2
+      '@radix-ui/react-accordion':
+        specifier: ^1.2.8
+        version: 1.2.8(@types/react@19.1.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       '@radix-ui/react-alert-dialog':
         specifier: ^1.1.11
         version: 1.1.11(@types/react@19.1.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -617,6 +620,19 @@ packages:
   '@radix-ui/primitive@1.1.2':
     resolution: {integrity: sha512-XnbHrrprsNqZKQhStrSwgRUQzoCI1glLzdw79xiZPoofhGICeZRSQ3dIxAKH1gb3OHfNf4d6f+vAv3kil2eggA==}
 
+  '@radix-ui/react-accordion@1.2.8':
+    resolution: {integrity: sha512-c7OKBvO36PfQIUGIjj1Wko0hH937pYFU2tR5zbIJDUsmTzHoZVHHt4bmb7OOJbzTaWJtVELKWojBHa7OcnUHmQ==}
+    peerDependencies:
+      '@types/react': '*'
+      '@types/react-dom': '*'
+      react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+      react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      '@types/react-dom':
+        optional: true
+
   '@radix-ui/react-alert-dialog@1.1.11':
     resolution: {integrity: sha512-4KfkwrFnAw3Y5Jeoq6G+JYSKW0JfIS3uDdFC/79Jw9AsMayZMizSSMxk1gkrolYXsa/WzbbDfOA7/D8N5D+l1g==}
     peerDependencies:
@@ -645,6 +661,19 @@ packages:
 
   '@radix-ui/react-checkbox@1.2.3':
     resolution: {integrity: sha512-pHVzDYsnaDmBlAuwim45y3soIN8H4R7KbkSVirGhXO+R/kO2OLCe0eucUEbddaTcdMHHdzcIGHtZSMSQlA+apw==}
+    peerDependencies:
+      '@types/react': '*'
+      '@types/react-dom': '*'
+      react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+      react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      '@types/react-dom':
+        optional: true
+
+  '@radix-ui/react-collapsible@1.1.8':
+    resolution: {integrity: sha512-hxEsLvK9WxIAPyxdDRULL4hcaSjMZCfP7fHB0Z1uUnDoDBat1Zh46hwYfa69DeZAbJrPckjf0AGAtEZyvDyJbw==}
     peerDependencies:
       '@types/react': '*'
       '@types/react-dom': '*'
@@ -4323,6 +4352,22 @@ snapshots:
 
   '@radix-ui/primitive@1.1.2': {}
 
+  '@radix-ui/react-accordion@1.2.8(@types/react@19.1.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
+    dependencies:
+      '@radix-ui/primitive': 1.1.2
+      '@radix-ui/react-collapsible': 1.1.8(@types/react@19.1.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      '@radix-ui/react-collection': 1.1.4(@types/react@19.1.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      '@radix-ui/react-compose-refs': 1.1.2(@types/react@19.1.2)(react@19.0.0)
+      '@radix-ui/react-context': 1.1.2(@types/react@19.1.2)(react@19.0.0)
+      '@radix-ui/react-direction': 1.1.1(@types/react@19.1.2)(react@19.0.0)
+      '@radix-ui/react-id': 1.1.1(@types/react@19.1.2)(react@19.0.0)
+      '@radix-ui/react-primitive': 2.1.0(@types/react@19.1.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      '@radix-ui/react-use-controllable-state': 1.2.2(@types/react@19.1.2)(react@19.0.0)
+      react: 19.0.0
+      react-dom: 19.0.0(react@19.0.0)
+    optionalDependencies:
+      '@types/react': 19.1.2
+
   '@radix-ui/react-alert-dialog@1.1.11(@types/react@19.1.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
     dependencies:
       '@radix-ui/primitive': 1.1.2
@@ -4354,6 +4399,21 @@ snapshots:
       '@radix-ui/react-use-controllable-state': 1.2.2(@types/react@19.1.2)(react@19.0.0)
       '@radix-ui/react-use-previous': 1.1.1(@types/react@19.1.2)(react@19.0.0)
       '@radix-ui/react-use-size': 1.1.1(@types/react@19.1.2)(react@19.0.0)
+      react: 19.0.0
+      react-dom: 19.0.0(react@19.0.0)
+    optionalDependencies:
+      '@types/react': 19.1.2
+
+  '@radix-ui/react-collapsible@1.1.8(@types/react@19.1.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
+    dependencies:
+      '@radix-ui/primitive': 1.1.2
+      '@radix-ui/react-compose-refs': 1.1.2(@types/react@19.1.2)(react@19.0.0)
+      '@radix-ui/react-context': 1.1.2(@types/react@19.1.2)(react@19.0.0)
+      '@radix-ui/react-id': 1.1.1(@types/react@19.1.2)(react@19.0.0)
+      '@radix-ui/react-presence': 1.1.4(@types/react@19.1.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      '@radix-ui/react-primitive': 2.1.0(@types/react@19.1.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      '@radix-ui/react-use-controllable-state': 1.2.2(@types/react@19.1.2)(react@19.0.0)
+      '@radix-ui/react-use-layout-effect': 1.1.1(@types/react@19.1.2)(react@19.0.0)
       react: 19.0.0
       react-dom: 19.0.0(react@19.0.0)
     optionalDependencies:

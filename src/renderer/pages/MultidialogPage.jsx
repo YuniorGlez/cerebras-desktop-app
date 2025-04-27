@@ -14,6 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const MODEL_CONTEXT_SIZES = {
     default: {
@@ -50,7 +51,10 @@ User Query:
 {USER_QUERY}
 
 Model Responses:
-{MODEL_RESPONSES}`;
+{MODEL_RESPONSES}
+
+Your unique response without mentioning the others responses:
+`;
 
 // NO LONGER STATIC: Calculate expected models count (excluding default and synthesis model)
 // const EXPECTED_MODELS_COUNT = Object.keys(MODEL_CONTEXT_SIZES).filter(
@@ -195,6 +199,12 @@ function MultidialogPage() {
         }
     };
 
+    // Dynamically calculate total expected response count based on iterations
+    const totalExpectedResponses = selectedTargetModels.reduce((sum, modelName) => {
+        const config = modelCallConfig[modelName] || { iterations: 1 };
+        return sum + Math.max(1, config.iterations);
+    }, 0);
+
     const handleSubmit = async () => {
         if (!userQuery || !userQuery.trim()) {
             toast.warning("Please enter your query.");
@@ -222,44 +232,52 @@ function MultidialogPage() {
             }
         }
 
+        // --- Reset state --- 
         setIsLoading(true);
         setResponses([]);
         setSynthesis({ response: null, error: null });
         setIsSynthesizing(false);
-        currentResponsesRef.current = [];
+        currentResponsesRef.current = []; // Reset the ref holding received responses
 
+        // --- Cleanup previous listener --- 
         if (responseListenerCleanup.current) {
             responseListenerCleanup.current();
             responseListenerCleanup.current = null;
         }
 
+        // --- Capture current state for this submission --- 
         const submittedUserQuery = userQuery;
         const submittedSynthesisInstructions = synthesisPrompt;
-        const submittedTargetModels = selectedTargetModels; // Use state
-        const submittedSynthesisModel = selectedSynthesisModel; // Use state
-        const submittedModelCallConfig = { ...modelCallConfig };
+        const submittedTargetModels = [...selectedTargetModels]; // Clone array
+        const submittedSynthesisModel = selectedSynthesisModel;
+        const submittedModelCallConfig = { ...modelCallConfig }; // Clone object
+        // Calculate expected count for THIS submission based on captured config
+        const expectedResponseCountForSubmission = submittedTargetModels.reduce((sum, modelName) => {
+            const config = submittedModelCallConfig[modelName] || { iterations: 1 };
+            return sum + Math.max(1, config.iterations);
+        }, 0);
 
         try {
             // Pass modelCallConfig to backend
             const query = window.electron.startMultidialogQuery(submittedUserQuery, submittedTargetModels, submittedModelCallConfig);
 
             responseListenerCleanup.current = query.onResponse(data => {
-                console.log("Received response:", data);
-                setResponses(prev => [...prev, { model: data.model, response: data.response, error: data.error }]);
-                currentResponsesRef.current = [
-                    ...currentResponsesRef.current,
-                    { model: data.model, response: data.response, error: data.error }
-                ];
+                console.log("Received response:", data); // data should include iteration
+                // Add to responses state for UI display (grouped later)
+                setResponses(prev => [...prev, data]);
+                // Add to ref used for checking completion
+                currentResponsesRef.current.push(data);
 
-                // Check if all SELECTED responses have arrived
-                if (currentResponsesRef.current.length >= expectedModelsCount) { // Use dynamic count
-                    console.log(`All ${expectedModelsCount} expected responses received.`);
+                // Check if all expected responses (including iterations) have arrived for THIS submission
+                if (currentResponsesRef.current.length >= expectedResponseCountForSubmission) {
+                    console.log(`All ${expectedResponseCountForSubmission} expected responses received.`);
                     if (responseListenerCleanup.current) {
                         responseListenerCleanup.current();
                         responseListenerCleanup.current = null;
                     }
-                    // Trigger synthesis with selected model
-                    triggerSynthesis(submittedUserQuery, submittedSynthesisInstructions, currentResponsesRef.current, submittedSynthesisModel);
+                    // Filter only the successful responses from the ref for synthesis
+                    const successfulResponsesForSynthesis = currentResponsesRef.current.filter(r => r.response && !r.error);
+                    triggerSynthesis(submittedUserQuery, submittedSynthesisInstructions, successfulResponsesForSynthesis, submittedSynthesisModel);
                 }
             });
 
@@ -281,211 +299,223 @@ function MultidialogPage() {
             });
     };
 
+    // Group responses by model for Accordion display
+    const groupedResponses = responses.reduce((acc, res) => {
+        if (!acc[res.model]) {
+            acc[res.model] = [];
+        }
+        acc[res.model].push(res); // Store the whole response object
+        return acc;
+    }, {});
+
     return (
         <TooltipProvider>
-            <div className="flex flex-col h-full p-4 space-y-4">
-                <h1 className="text-2xl font-semibold">Multidialog Configuration</h1>
-                <p className="text-muted-foreground">
-                    Configure target models for parallel querying and the final model for synthesizing the results.
-                </p>
+            <div className="grid grid-cols-2 gap-4 h-full overflow-hidden">
 
-                {/* Model Selection Section */}
-                <div className="grid grid-cols-2 gap-4 border p-4 rounded-md">
-                    {/* Target Model Selection */}
-                    <div className="space-y-2">
-                        <Label className="font-medium">Target Models (for parallel query)</Label>
-                        <ScrollArea className="h-48 border rounded-md p-2">
+                {/* Left Column: Configuration */}
+                <ScrollArea className="h-full p-4 border-r">
+                    <div className="space-y-4">
+                        <h1 className="text-2xl font-semibold">Multidialog Configuration</h1>
+                        <p className="text-muted-foreground">
+                            Configure target models, iterations, delays, and synthesis model.
+                        </p>
+
+                        {/* Model Selection Section */}
+                        <div className="grid grid-cols-1 gap-4 border p-4 rounded-md">
+                            {/* Target Model Selection */}
                             <div className="space-y-2">
-                                {AVAILABLE_MODELS.map(modelName => (
-                                    <div
-                                        key={modelName}
-                                        className="grid grid-cols-[auto,1fr,60px,32px,60px,60px] items-center gap-2"
-                                    >
-                                        <Checkbox
-                                            id={`target-${modelName}`}
-                                            checked={selectedTargetModels.includes(modelName)}
-                                            onCheckedChange={() => handleTargetModelToggle(modelName)}
-                                            disabled={isLoading || isSynthesizing}
-                                        />
-                                        <label
-                                            htmlFor={`target-${modelName}`}
-                                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                        >
-                                            {modelName}
-                                        </label>
-                                        {selectedTargetModels.includes(modelName) ? (
-                                            <>
-                                                <Input
-                                                    type="number"
-                                                    min={1}
-                                                    value={modelCallConfig[modelName]?.iterations || 1}
-                                                    onChange={e => handleModelConfigChange(modelName, 'iterations', e.target.value)}
-                                                    className="w-14 h-7 text-xs px-1"
+                                <Label className="font-medium">Target Models (for parallel query)</Label>
+                                <ScrollArea className="h-48 border rounded-md p-2">
+                                    <div className="space-y-2">
+                                        {AVAILABLE_MODELS.map(modelName => (
+                                            <div
+                                                key={modelName}
+                                                className="grid grid-cols-[auto,1fr,60px,32px,60px,60px] items-center gap-2"
+                                            >
+                                                <Checkbox
+                                                    id={`target-${modelName}`}
+                                                    checked={selectedTargetModels.includes(modelName)}
+                                                    onCheckedChange={() => handleTargetModelToggle(modelName)}
                                                     disabled={isLoading || isSynthesizing}
                                                 />
-                                                <span className="text-xs">iter</span>
-                                                <Input
-                                                    type="number"
-                                                    min={0}
-                                                    value={modelCallConfig[modelName]?.delaySec || 0}
-                                                    onChange={e => handleModelConfigChange(modelName, 'delaySec', e.target.value)}
-                                                    className="w-14 h-7 text-xs px-1"
-                                                    disabled={isLoading || isSynthesizing}
-                                                />
-                                                <span className="text-xs">sec delay</span>
-                                            </>
-                                        ) : (
-                                            <><div></div><div></div><div></div><div></div></>
-                                        )}
+                                                <label
+                                                    htmlFor={`target-${modelName}`}
+                                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                                >
+                                                    {modelName}
+                                                </label>
+                                                {selectedTargetModels.includes(modelName) ? (
+                                                    <>
+                                                        <Input
+                                                            type="number"
+                                                            min={1}
+                                                            value={modelCallConfig[modelName]?.iterations || 1}
+                                                            onChange={e => handleModelConfigChange(modelName, 'iterations', e.target.value)}
+                                                            className="w-14 h-7 text-xs px-1"
+                                                            disabled={isLoading || isSynthesizing}
+                                                        />
+                                                        <span className="text-xs">iter</span>
+                                                        <Input
+                                                            type="number"
+                                                            min={0}
+                                                            value={modelCallConfig[modelName]?.delaySec || 0}
+                                                            onChange={e => handleModelConfigChange(modelName, 'delaySec', e.target.value)}
+                                                            className="w-14 h-7 text-xs px-1"
+                                                            disabled={isLoading || isSynthesizing}
+                                                        />
+                                                        <span className="text-xs">sec delay</span>
+                                                    </>
+                                                ) : (
+                                                    <><div></div><div></div><div></div><div></div></>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
+                                </ScrollArea>
+                                <p className="text-xs text-muted-foreground">Set calls and delay for each model. Synthesis will wait for all iterations to finish.</p>
+                                <div className="text-xs mt-2">Total wait before synthesis: <span className="font-bold">{totalWaitSec}s</span></div>
                             </div>
-                        </ScrollArea>
-                        <p className="text-xs text-muted-foreground">Set calls and delay for each model. Synthesis will wait for all iterations to finish.</p>
-                        <div className="text-xs mt-2">Total wait before synthesis: <span className="font-bold">{totalWaitSec}s</span></div>
-                    </div>
 
-                    {/* Synthesis Model Selection */}
-                    <div className="space-y-2">
-                        <Label htmlFor="synthesis-model-select" className="font-medium">Synthesis Model (for final answer)</Label>
-                        <Select
-                            id="synthesis-model-select"
-                            value={selectedSynthesisModel}
-                            onValueChange={handleSynthesisModelSelect}
-                            disabled={isLoading || isSynthesizing}
-                        >
-                            <SelectTrigger className="w-full">
-                                <Bot className="h-4 w-4 mr-2 text-muted-foreground" />
-                                <SelectValue placeholder="Select synthesis model..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {AVAILABLE_MODELS.map(modelName => (
-                                    <SelectItem key={modelName} value={modelName}>
-                                        {modelName}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">Model used to combine results.</p>
-                    </div>
-                </div>
-
-                {/* User Query Input */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between mb-1">
-                        <Label htmlFor="user-query">Your Query</Label>
-                        <div className="flex space-x-2">
-                            {/* Prompt Template Select */}
-                            <Select onValueChange={handlePromptSelect} disabled={isLoading || isSynthesizing || prompts.length === 0}>
-                                <SelectTrigger className="w-[180px] h-8 text-xs" aria-label="Select Prompt Template">
-                                    <FileText className="h-3 w-3 mr-1 text-muted-foreground" />
-                                    <SelectValue placeholder="Load Prompt..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {prompts.map((prompt) => (
-                                        <SelectItem key={prompt.id} value={prompt.id} className="text-xs">
-                                            {prompt.name}
-                                        </SelectItem>
-                                    ))}
-                                    {prompts.length === 0 && <SelectItem value="no-prompts" disabled>No saved prompts</SelectItem>}
-                                </SelectContent>
-                            </Select>
-                            {/* Context Select */}
-                            <Select onValueChange={handleContextSelect} disabled={isLoading || isSynthesizing || contexts.length === 0}>
-                                <SelectTrigger className="w-[180px] h-8 text-xs" aria-label="Select Context">
-                                    <FolderSearch className="h-3 w-3 mr-1 text-muted-foreground" />
-                                    <SelectValue placeholder="Apply Context..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {contexts.map((context) => (
-                                        <SelectItem key={context.id} value={context.id} className="text-xs">
-                                            {context.name}
-                                        </SelectItem>
-                                    ))}
-                                    {contexts.length === 0 && <SelectItem value="no-contexts" disabled>No saved contexts</SelectItem>}
-                                </SelectContent>
-                            </Select>
+                            {/* Synthesis Model Selection */}
+                            <div className="space-y-2">
+                                <Label htmlFor="synthesis-model-select" className="font-medium">Synthesis Model (for final answer)</Label>
+                                <Select
+                                    id="synthesis-model-select"
+                                    value={selectedSynthesisModel}
+                                    onValueChange={handleSynthesisModelSelect}
+                                    disabled={isLoading || isSynthesizing}
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <Bot className="h-4 w-4 mr-2 text-muted-foreground" />
+                                        <SelectValue placeholder="Select synthesis model..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {AVAILABLE_MODELS.map(modelName => (
+                                            <SelectItem key={modelName} value={modelName}>
+                                                {modelName}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">Model used to combine results.</p>
+                            </div>
                         </div>
-                    </div>
-                    <Textarea
-                        id="user-query"
-                        placeholder="Enter your query here, or select a prompt/context above..."
-                        value={userQuery}
-                        onChange={handleUserQueryChange}
-                        rows={5}
-                        className="flex-grow-0"
-                        disabled={isLoading || isSynthesizing}
-                    />
-                </div>
 
-                {/* Synthesis Instructions Input */}
-                <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                        <Label htmlFor="synthesis-prompt">Synthesis Prompt Template (for {selectedSynthesisModel})</Label>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            type="button"
-                            onClick={() => setIsSynthesisPromptModalOpen(true)}
-                            className="ml-2"
-                        >
-                            Show / Change
-                        </Button>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-xs">
-                                <p>This prompt instructs the final model ({selectedSynthesisModel}) on how to combine the answers. Placeholders {`{USER_QUERY}`} and {`{MODEL_RESPONSES}`} will be filled.</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </div>
-                    {/* Preview of current synthesis prompt (truncated) */}
-                    <div className="hidden text-xs text-muted-foreground bg-muted rounded p-2 font-mono max-h-16 overflow-hidden whitespace-pre-line">
-                        {synthesisPrompt.split('\n').slice(0, 2).join('\n')}{synthesisPrompt.split('\n').length > 2 ? '...' : ''}
-                    </div>
-                    {/* Modal for editing synthesis prompt */}
-                    <Dialog open={isSynthesisPromptModalOpen} onOpenChange={setIsSynthesisPromptModalOpen}>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Edit Synthesis Prompt Template</DialogTitle>
-                            </DialogHeader>
+                        {/* User Query Input */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between mb-1">
+                                <Label htmlFor="user-query">Your Query</Label>
+                                <div className="flex space-x-2">
+                                    {/* Prompt Template Select */}
+                                    <Select onValueChange={handlePromptSelect} disabled={isLoading || isSynthesizing || prompts.length === 0}>
+                                        <SelectTrigger className="w-[180px] h-8 text-xs" aria-label="Select Prompt Template">
+                                            <FileText className="h-3 w-3 mr-1 text-muted-foreground" />
+                                            <SelectValue placeholder="Load Prompt..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {prompts.map((prompt) => (
+                                                <SelectItem key={prompt.id} value={prompt.id} className="text-xs">
+                                                    {prompt.name}
+                                                </SelectItem>
+                                            ))}
+                                            {prompts.length === 0 && <SelectItem value="no-prompts" disabled>No saved prompts</SelectItem>}
+                                        </SelectContent>
+                                    </Select>
+                                    {/* Context Select */}
+                                    <Select onValueChange={handleContextSelect} disabled={isLoading || isSynthesizing || contexts.length === 0}>
+                                        <SelectTrigger className="w-[180px] h-8 text-xs" aria-label="Select Context">
+                                            <FolderSearch className="h-3 w-3 mr-1 text-muted-foreground" />
+                                            <SelectValue placeholder="Apply Context..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {contexts.map((context) => (
+                                                <SelectItem key={context.id} value={context.id} className="text-xs">
+                                                    {context.name}
+                                                </SelectItem>
+                                            ))}
+                                            {contexts.length === 0 && <SelectItem value="no-contexts" disabled>No saved contexts</SelectItem>}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
                             <Textarea
-                                id="synthesis-prompt-modal"
-                                placeholder="Enter the instructions for the synthesis model..."
-                                value={synthesisPrompt}
-                                onChange={handleSynthesisPromptChange}
-                                rows={8}
-                                className="font-mono text-sm"
+                                id="user-query"
+                                placeholder="Enter your query here, or select a prompt/context above..."
+                                value={userQuery}
+                                onChange={handleUserQueryChange}
+                                rows={5}
+                                className="flex-grow-0"
                                 disabled={isLoading || isSynthesizing}
                             />
-                            <DialogFooter>
-                                <Button
-                                    variant="secondary"
-                                    type="button"
-                                    onClick={() => setIsSynthesisPromptModalOpen(false)}
-                                >
-                                    Save
-                                </Button>
+                        </div>
+
+                        {/* Synthesis Instructions Input (Modal Trigger) */}
+                        <div className="space-y-2">
+                            <div className="flex items-center space-x-2">
+                                <Label htmlFor="synthesis-prompt">Synthesis Prompt Template (for {selectedSynthesisModel})</Label>
                                 <Button
                                     variant="outline"
+                                    size="sm"
                                     type="button"
-                                    onClick={() => setIsSynthesisPromptModalOpen(false)}
+                                    onClick={() => setIsSynthesisPromptModalOpen(true)}
+                                    className="ml-2"
                                 >
-                                    Cancel
+                                    Show / Change
                                 </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                </div>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="max-w-xs">
+                                        <p>This prompt instructs the final model ({selectedSynthesisModel}) on how to combine the answers. Placeholders {`{USER_QUERY}`} and {`{MODEL_RESPONSES}`} will be filled.</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                            {/* Modal for editing synthesis prompt */}
+                            <Dialog open={isSynthesisPromptModalOpen} onOpenChange={setIsSynthesisPromptModalOpen}>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Edit Synthesis Prompt Template</DialogTitle>
+                                    </DialogHeader>
+                                    <Textarea
+                                        id="synthesis-prompt-modal"
+                                        placeholder="Enter the instructions for the synthesis model..."
+                                        value={synthesisPrompt}
+                                        onChange={handleSynthesisPromptChange}
+                                        rows={8}
+                                        className="font-mono text-sm"
+                                        disabled={isLoading || isSynthesizing}
+                                    />
+                                    <DialogFooter>
+                                        <Button
+                                            variant="secondary"
+                                            type="button"
+                                            onClick={() => setIsSynthesisPromptModalOpen(false)}
+                                        >
+                                            Save
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            type="button"
+                                            onClick={() => setIsSynthesisPromptModalOpen(false)}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
 
-                <Button onClick={handleSubmit} disabled={isLoading || isSynthesizing || !userQuery.trim() || selectedTargetModels.length === 0}>
-                    {isLoading ? 'Generating Responses...' : isSynthesizing ? 'Synthesizing...' : 'Submit Query'}
-                </Button>
+                        <Button onClick={handleSubmit} disabled={isLoading || isSynthesizing || !userQuery.trim() || selectedTargetModels.length === 0}>
+                            {isLoading ? 'Generating Responses...' : isSynthesizing ? 'Synthesizing...' : 'Submit Query'}
+                        </Button>
+                    </div>
+                </ScrollArea>
 
-                <ScrollArea className="flex-grow">
+                {/* Right Column: Results */}
+                <ScrollArea className="h-full p-4">
                     <div className="space-y-4">
-                        {/* Synthesized Response */}
+                        {/* Synthesized Response (always visible when available) */}
                         {(synthesis.response || synthesis.error || isSynthesizing) && (
                             <Card className="border-primary">
                                 <CardHeader>
@@ -511,39 +541,50 @@ function MultidialogPage() {
                             </Card>
                         )}
 
-                        {/* Individual Responses */}
-                        {isLoading && responses.length === 0 && (
+                        {/* Individual Responses (in Accordion) */}
+                        {isLoading && Object.keys(groupedResponses).length === 0 && (
                             <p className="text-center text-muted-foreground py-4">Sending query to {selectedTargetModels.length} model(s)...</p>
                         )}
-                        {(!isLoading || responses.length > 0) && responses.length > 0 && (
+                        {(!isLoading || Object.keys(groupedResponses).length > 0) && Object.keys(groupedResponses).length > 0 && (
                             <h2 className="text-lg font-semibold pt-4">Individual Model Responses</h2>
                         )}
-                        {responses.map((res, index) => (
-                            <Card key={`${res.model}-${index}`}>
-                                <CardHeader>
-                                    <CardTitle className="flex justify-between items-center">
-                                        {res.model}
-                                        {res.response && !res.error && (
-                                            <Button variant="ghost" size="icon" onClick={() => copyToClipboard(res.response)}>
-                                                <Copy className="h-4 w-4" />
-                                            </Button>
-                                        )}
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {res.error && (
-                                        <Alert variant="destructive">
-                                            <AlertTitle>Error</AlertTitle>
-                                            <AlertDescription>{res.error}</AlertDescription>
-                                        </Alert>
-                                    )}
-                                    {res.response && <p>{res.response}</p>}
-                                    {!res.response && !res.error && (
-                                        <p className="text-muted-foreground italic">Waiting for response...</p>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        ))}
+                        <Accordion type="multiple" className="w-full">
+                            {Object.entries(groupedResponses).map(([modelName, modelResponses]) => (
+                                <AccordionItem value={modelName} key={modelName}>
+                                    <AccordionTrigger>{modelName} ({modelResponses.length} response{modelResponses.length > 1 ? 's' : ''})</AccordionTrigger>
+                                    <AccordionContent>
+                                        <div className="space-y-2">
+                                            {modelResponses.map((res, index) => (
+                                                <Card key={`${res.model}-${index}`}>
+                                                    <CardHeader className="p-3">
+                                                        <CardTitle className="text-sm flex justify-between items-center">
+                                                            Response {index + 1}
+                                                            {res.response && !res.error && (
+                                                                <Button variant="ghost" size="icon" onClick={() => copyToClipboard(res.response)} className="h-6 w-6">
+                                                                    <Copy className="h-3 w-3" />
+                                                                </Button>
+                                                            )}
+                                                        </CardTitle>
+                                                    </CardHeader>
+                                                    <CardContent className="p-3 pt-0">
+                                                        {res.error && (
+                                                            <Alert variant="destructive" className="p-2 text-xs">
+                                                                <AlertTitle className="text-xs">Error</AlertTitle>
+                                                                <AlertDescription>{res.error}</AlertDescription>
+                                                            </Alert>
+                                                        )}
+                                                        {res.response && <p className="text-sm">{res.response}</p>}
+                                                        {!res.response && !res.error && (
+                                                            <p className="text-muted-foreground italic text-sm">Waiting for response...</p>
+                                                        )}
+                                                    </CardContent>
+                                                </Card>
+                                            ))}
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
                     </div>
                 </ScrollArea>
             </div>

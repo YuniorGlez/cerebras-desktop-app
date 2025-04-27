@@ -46,8 +46,8 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   // Multidialog API
-  startMultidialogQuery: (userPrompt, targetModels) => {
-    ipcRenderer.send('multidialog-query', userPrompt, targetModels);
+  startMultidialogQuery: (userPrompt, targetModels, modelCallConfig) => {
+    ipcRenderer.send('multidialog-query', userPrompt, targetModels, modelCallConfig);
     return {
       onResponse: (callback) => {
         // This listener will be called multiple times, once for each model response

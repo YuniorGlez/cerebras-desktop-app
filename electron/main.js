@@ -91,9 +91,9 @@ app.whenReady().then(async () => {
   });
 
   // Multidialog query handler
-  ipcMain.on('multidialog-query', async (event, userPrompt, targetModels) => {
+  ipcMain.on('multidialog-query', async (event, userPrompt, targetModels, modelCallConfig) => {
     const currentSettings = loadSettings();
-    chatHandler.handleMultidialogQuery(event, userPrompt, targetModels, currentSettings);
+    chatHandler.handleMultidialogQuery(event, userPrompt, targetModels, modelCallConfig, currentSettings);
   });
 
   // Multidialog synthesis handler (using handle for async return)

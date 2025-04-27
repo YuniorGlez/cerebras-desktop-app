@@ -271,68 +271,84 @@ async function handleChatStream(event, messages, model, settings, modelContextSi
  * @param {Electron.IpcMainEvent} event - The IPC event object.
  * @param {string} userPrompt - The user's prompt.
  * @param {string[]} targetModels - Array of model names to query.
+ * @param {object} modelCallConfig - Object mapping modelName to { iterations, delaySec }.
  * @param {object} settings - The current application settings.
  */
-async function handleMultidialogQuery(event, userPrompt, targetModels, settings) {
-    console.log(`Handling multidialog-query for ${targetModels.length} models. Prompt: ${userPrompt.substring(0, 50)}...`);
+async function handleMultidialogQuery(event, userPrompt, targetModels, modelCallConfig, settings) {
+    console.log(`Handling multidialog-query for ${targetModels.length} models. Prompt: ${userPrompt.substring(0, 50)}...`, modelCallConfig);
 
     if (!settings.CEREBRAS_API_KEY || settings.CEREBRAS_API_KEY === "<replace me>") {
-        // Send error for each target model so frontend knows to expect N responses
         targetModels.forEach(modelName => {
-            event.sender.send('multidialog-response', {
-                model: modelName,
-                error: "API key not configured. Please add your CEREBRAS API key in settings.",
-            });
+            const config = modelCallConfig[modelName] || { iterations: 1 };
+            for (let i = 0; i < config.iterations; i++) {
+                event.sender.send('multidialog-response', {
+                    model: modelName,
+                    iteration: i + 1, // Add iteration number
+                    error: "API key not configured. Please add your CEREBRAS API key in settings.",
+                });
+            }
         });
         return;
     }
     if (!targetModels || targetModels.length === 0) {
         console.warn("Multidialog query called with no target models.");
-        return; // Or send an appropriate error/empty response?
+        return;
     }
 
     const client = new Cerebras({ apiKey: settings.CEREBRAS_API_KEY });
 
-    // Use the provided targetModels array directly
     console.log(`Querying models: ${targetModels.join(', ')}`);
 
-    const promises = targetModels.map(async (modelName) => {
-        try {
-            console.log(`Querying ${modelName}...`);
-            const completion = await client.chat.completions.create({
-                messages: [
-                    { role: "system", content: "You are a helpful assistant." },
-                    { role: "user", content: userPrompt },
-                ],
-                model: modelName,
-                temperature: settings.temperature ?? 0.7,
-                top_p: settings.top_p ?? 0.95,
-                stream: false, // We want the full response for each model here
-            });
+    // Helper function for delays
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-            const responseContent = completion.choices?.[0]?.message?.content;
-            console.log(`Response from ${modelName} received.`);
-            event.sender.send('multidialog-response', {
-                model: modelName,
-                response: responseContent || "No content received",
-                error: null,
-            });
-        } catch (error) {
-            console.error(`Error querying model ${modelName}:`, error);
-            event.sender.send('multidialog-response', {
-                model: modelName,
-                response: null,
-                error: `Failed to get response: ${error.message}`,
-            });
+    const promises = targetModels.map(async (modelName) => {
+        const config = modelCallConfig[modelName] || { iterations: 1, delaySec: 0 };
+        const iterations = Math.max(1, config.iterations); // Ensure at least 1 iteration
+        const delayMs = Math.max(0, config.delaySec * 1000);
+
+        for (let i = 0; i < iterations; i++) {
+            try {
+                if (i > 0 && delayMs > 0) {
+                    console.log(`Delaying ${delayMs}ms before iteration ${i + 1} for ${modelName}`);
+                    await delay(delayMs);
+                }
+                console.log(`Querying ${modelName} (Iteration ${i + 1}/${iterations})...`);
+                const completion = await client.chat.completions.create({
+                    messages: [
+                        { role: "system", content: "You are a helpful assistant." },
+                        { role: "user", content: userPrompt }, // Maybe add iteration info? { role: "user", content: `${userPrompt}\n\n(Iteration ${i+1})` }
+                    ],
+                    model: modelName,
+                    temperature: settings.temperature ?? 0.7,
+                    top_p: settings.top_p ?? 0.95,
+                    stream: false,
+                });
+
+                const responseContent = completion.choices?.[0]?.message?.content;
+                console.log(`Response from ${modelName} (Iteration ${i + 1}) received.`);
+                event.sender.send('multidialog-response', {
+                    model: modelName,
+                    iteration: i + 1,
+                    response: responseContent || "No content received",
+                    error: null,
+                });
+            } catch (error) {
+                console.error(`Error querying model ${modelName} (Iteration ${i + 1}):`, error);
+                event.sender.send('multidialog-response', {
+                    model: modelName,
+                    iteration: i + 1,
+                    response: null,
+                    error: `Failed to get response: ${error.message}`,
+                });
+                // Optional: break loop on error?
+            }
         }
     });
 
-    // Wait for all individual model queries to start sending responses
-    // The actual waiting happens on the frontend as responses arrive
     Promise.allSettled(promises).then(() => {
-        console.log("All multidialog queries initiated.");
-        // Optionally send a final event when all attempts are done, though individual responses handle this
-        // event.sender.send('multidialog-all-attempts-complete');
+        console.log("All multidialog query iterations initiated.");
+        // Note: Synthesis trigger logic is handled on the frontend based on expected total responses
     });
 }
 
