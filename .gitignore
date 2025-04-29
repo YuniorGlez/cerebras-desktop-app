@@ -29,3 +29,5 @@ tasks.json
 tasks/ 
 
 dist/
+memory-bank/activeContext.md
+memory-bank/progress.md
